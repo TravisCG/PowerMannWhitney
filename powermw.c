@@ -115,13 +115,35 @@ double mannwhitney(double *set, int *groups, int num) {
 	return(z);
 }
 
+void onegroup(FILE *grpfile, char *colid, FILE *valuefile){
+	while(fgets(buffer, buffsize, grpfile) != NULL){
+		if(strncmp(buffer, colid) >= 0){
+			// We found the actual group entry
+		}
+	}
+
+	while(fgets(buffer, buffsize, valuefile) != NULL){
+		// Do MannWhitney
+	}
+}
+
 int main(int argc, char **argv){
-	double data[] = {5.0, 10.0, 6.0, 11.0, 3.0, 7.0, 4.0, 9.0, 1.0, 3.0, 8.0, 2.0, 4.0, 5.0, 7.0, 4.0, 10.0, 1.0, 13.0, 11.0, 12.0, 13.0, 14.0, 15.0, 5.0, 16.0, 17.0, 18.0, 19.0, 20.0, 3.0};
-	int  groups[] = {1  , 1   , 1  , 1   , 1  , 1  , 1  , 1  , 1  , 1  , 1  , 1  , 1  , 1  , 1  , 1  , 1   , 1  , 1   , 0   , 0   , 0   , 0   , 0   , 0  , 0   , 0   , 0   , 0   , 0   , 0  };
+	double *data;
+	int  *groups;
 	int i;
+	FILE *grpfile;
+	FILE *valuefile;
+	char *buffer;
+
+	grpfile   = fopen("", "r");
+	valuefile = fopen("", "r");
 
 	for(i = 0; i < 60000; i++){
 		mannwhitney(data, groups, 31);
 	}
+
+	fclose(grpfile);
+	fclose(valuefile);
+
 	return(0);
 }
