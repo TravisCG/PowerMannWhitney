@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
+
+#define MAXWIDTH 10000
+#define BUFFSIZE 30000
 
 int partition(double *set, int *groups, int lo, int hi){
 	double pivot, dummy;
@@ -115,32 +119,70 @@ double mannwhitney(double *set, int *groups, int num) {
 	return(z);
 }
 
-void onegroup(FILE *grpfile, char *colid, FILE *valuefile){
+void onegroup(FILE *grpfile, char *rowid, FILE *valuefile){
+	char *buffer;
+	int buffsize = BUFFSIZE;
+	char *actrowid;
+	char *value;
+	int *groups;
+	int width = 0;
+	int count;
+	double *set;
+	double pvalue;
+
+	buffer = malloc(sizeof(char) * buffsize);
+	groups = malloc(sizeof(int) * MAXWIDTH);
+	set    = malloc(sizeof(int) * MAXWIDTH);
+
 	while(fgets(buffer, buffsize, grpfile) != NULL){
-		if(strncmp(buffer, colid) >= 0){
-			// We found the actual group entry
+		actrowid = strtok(buffer, "\t");
+		if(!strcmp(actrowid, rowid)){
+			// extract group information
+			while(1){
+				value = strtok(NULL, "\t\n");
+				if(value == NULL){
+					break;
+				}
+				if(!strcmp(value, "1")){
+					groups[width] = 1;
+				}
+				else{
+					groups[width] = 0;
+				}
+				width++;
+			};
 		}
 	}
 
 	while(fgets(buffer, buffsize, valuefile) != NULL){
 		// Do MannWhitney
+		actrowid = strtok(buffer, "\t");
+		count = 0;
+		while(1){
+			value = strtok(NULL, "\t\n");
+			if(value == NULL){
+				break;
+			}
+			set[count] = atof(value);
+			count++;
+		}
+		pvalue = mannwhitney(set, groups, width);
+		printf("%s\t%f\n", actrowid, pvalue);
 	}
+
+	free(buffer);
+	free(groups);
+	free(set);
 }
 
 int main(int argc, char **argv){
-	double *data;
-	int  *groups;
-	int i;
 	FILE *grpfile;
 	FILE *valuefile;
-	char *buffer;
 
-	grpfile   = fopen("", "r");
-	valuefile = fopen("", "r");
+	grpfile   = fopen(argv[1], "r");
+	valuefile = fopen(argv[2], "r");
 
-	for(i = 0; i < 60000; i++){
-		mannwhitney(data, groups, 31);
-	}
+	onegroup(grpfile, "row100", valuefile);
 
 	fclose(grpfile);
 	fclose(valuefile);
