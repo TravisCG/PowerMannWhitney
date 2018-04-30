@@ -132,7 +132,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile){
 
 	buffer = malloc(sizeof(char) * buffsize);
 	groups = malloc(sizeof(int) * MAXWIDTH);
-	set    = malloc(sizeof(int) * MAXWIDTH);
+	set    = malloc(sizeof(double) * MAXWIDTH);
 
 	while(fgets(buffer, buffsize, grpfile) != NULL){
 		actrowid = strtok(buffer, "\t");
@@ -175,6 +175,56 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile){
 	free(set);
 }
 
+void onevalue(FILE *valuefile, char *rowid, FILE *grpfile){
+	char *buffer;
+	int buffsize = BUFFSIZE;
+	char *actrowid;
+	int count = 0;
+	double *set;
+	char *value;
+	double pvalue;
+	int *groups;
+
+	buffer = malloc(sizeof(char) * buffsize);
+	set    = malloc(sizeof(double) * MAXWIDTH);
+	groups = malloc(sizeof(int) * MAXWIDTH);
+
+	while( fgets(buffer, buffsize, valuefile) != NULL){
+		actrowid = strtok(buffer, "\t");
+		if(!strcmp(actrowid, rowid)){
+			while(1){
+				value = strtok(NULL, "\t\n");
+				if(value == NULL){
+					break;
+				}
+				set[count] = atof(value);
+				count++;
+			}
+		}
+	}
+
+	while( fgets(buffer, buffsize, grpfile) != NULL ){
+		actrowid = strtok(buffer, "\t");
+		count = 0;
+		while(1){
+			value = strtok(NULL, "\t\n");
+			if(!strcmp(value, "1")){
+				groups[count] = 1;
+			}
+			else{
+				groups[count] = 0;
+			}
+			count++;
+		}
+		pvalue = mannwhitney(set, groups, count);
+		printf("%s\t%f\n", actrowid, pvalue);
+	}
+
+	free(buffer);
+	free(set);
+	free(groups);
+}
+
 int main(int argc, char **argv){
 	FILE *grpfile;
 	FILE *valuefile;
@@ -182,7 +232,8 @@ int main(int argc, char **argv){
 	grpfile   = fopen(argv[1], "r");
 	valuefile = fopen(argv[2], "r");
 
-	onegroup(grpfile, "row100", valuefile);
+	//onegroup(grpfile, "row100", valuefile);
+	onevalue(valuefile, "row2450", grpfile);
 
 	fclose(grpfile);
 	fclose(valuefile);
