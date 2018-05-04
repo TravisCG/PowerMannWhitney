@@ -156,6 +156,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile){
 
 	fgets(buffer, buffsize, valuefile); // read header
 	while(fgets(buffer, buffsize, valuefile) != NULL){
+		fgets(buffer, buffsize, valuefile);
 		// Do MannWhitney
 		actrowid = strtok(buffer, "\t");
 		count = 0;
