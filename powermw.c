@@ -154,6 +154,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile){
 		}
 	}
 
+	fgets(buffer, buffsize, valuefile); // read header
 	while(fgets(buffer, buffsize, valuefile) != NULL){
 		// Do MannWhitney
 		actrowid = strtok(buffer, "\t");
@@ -203,11 +204,15 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile){
 		}
 	}
 
+	fgets(buffer, buffsize, grpfile); // read header
 	while( fgets(buffer, buffsize, grpfile) != NULL ){
 		actrowid = strtok(buffer, "\t");
 		count = 0;
 		while(1){
 			value = strtok(NULL, "\t\n");
+			if(value == NULL){
+				break;
+			}
 			if(!strcmp(value, "1")){
 				groups[count] = 1;
 			}
@@ -225,15 +230,22 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile){
 	free(groups);
 }
 
+/*
+ * Usage: powermw onegroup|onealue rowid groupfile valuefile
+ */
 int main(int argc, char **argv){
 	FILE *grpfile;
 	FILE *valuefile;
 
-	grpfile   = fopen(argv[1], "r");
-	valuefile = fopen(argv[2], "r");
+	grpfile   = fopen(argv[3], "r");
+	valuefile = fopen(argv[4], "r");
 
-	//onegroup(grpfile, "row100", valuefile);
-	onevalue(valuefile, "row2450", grpfile);
+	if(!strcmp(argv[1], "onegroup")){
+		onegroup(grpfile, argv[2], valuefile);
+	}
+	else{
+		onevalue(valuefile, argv[2], grpfile);
+	}
 
 	fclose(grpfile);
 	fclose(valuefile);
