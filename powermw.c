@@ -4,7 +4,7 @@
 #include <math.h>
 
 #define MAXWIDTH 10000
-#define BUFFSIZE 30000
+#define BUFFSIZE 50000
 
 int partition(double *set, int *groups, int lo, int hi){
 	double pivot, dummy;
@@ -119,7 +119,7 @@ double mannwhitney(double *set, int *groups, int num) {
 	return(z);
 }
 
-void onegroup(FILE *grpfile, char *rowid, FILE *valuefile){
+void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 	char *buffer;
 	int buffsize = BUFFSIZE;
 	char *actrowid;
@@ -129,6 +129,11 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile){
 	int count;
 	double *set;
 	double pvalue;
+	int i;
+	int linenum = -1;
+	int prevperc;
+	int perc;
+	char found = 0;
 
 	buffer = malloc(sizeof(char) * buffsize);
 	groups = malloc(sizeof(int) * MAXWIDTH);
@@ -151,11 +156,27 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile){
 				}
 				width++;
 			};
+			found = 1;
+			break;
 		}
 	}
 
-	fgets(buffer, buffsize, valuefile); // read header
+	if(!found){
+		printf("WARNING:Row not found\n");
+		free(buffer);
+		free(groups);
+		free(set);
+		return;
+	}
+
 	while(fgets(buffer, buffsize, valuefile) != NULL){
+		linenum++;
+	}
+	rewind(valuefile);
+
+	fgets(buffer, buffsize, valuefile); // read header
+	fprintf(output, "Gene\tPvalue\n");
+	for(i = 0; i < linenum; i++){
 		fgets(buffer, buffsize, valuefile);
 		// Do MannWhitney
 		actrowid = strtok(buffer, "\t");
@@ -169,7 +190,13 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile){
 			count++;
 		}
 		pvalue = mannwhitney(set, groups, width);
-		printf("%s\t%f\n", actrowid, pvalue);
+		fprintf(output, "%s\t%f\n", actrowid, pvalue);
+
+		perc = i * 100 / linenum;
+		if( perc % 10 == 0 && perc != prevperc){
+			printf("MESSAGE:%d%%\n", perc);
+			prevperc = perc;
+		}
 	}
 
 	free(buffer);
@@ -177,7 +204,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile){
 	free(set);
 }
 
-void onevalue(FILE *valuefile, char *rowid, FILE *grpfile){
+void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 	char *buffer;
 	int buffsize = BUFFSIZE;
 	char *actrowid;
@@ -186,6 +213,11 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile){
 	char *value;
 	double pvalue;
 	int *groups;
+	int i;
+	int linenum = -1;
+	int perc;
+	int prevperc;
+	char found = 0;
 
 	buffer = malloc(sizeof(char) * buffsize);
 	set    = malloc(sizeof(double) * MAXWIDTH);
@@ -203,10 +235,27 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile){
 				count++;
 			}
 		}
+		found = 1;
+		break;
 	}
 
+	if(!found){
+		printf("WARNING:Row not found\n");
+		free(buffer);
+		free(set);
+		free(groups);
+		return;
+	}
+
+	while(fgets(buffer, buffsize, grpfile) != NULL){
+		linenum++;
+	}
+	rewind(grpfile);
+
 	fgets(buffer, buffsize, grpfile); // read header
-	while( fgets(buffer, buffsize, grpfile) != NULL ){
+	fprintf(output, "Gene\tPvalue\n");
+	for(i = 0; i < linenum; i++){
+		fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
 		count = 0;
 		while(1){
@@ -223,7 +272,13 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile){
 			count++;
 		}
 		pvalue = mannwhitney(set, groups, count);
-		printf("%s\t%f\n", actrowid, pvalue);
+		fprintf(output, "%s\t%f\n", actrowid, pvalue);
+
+		perc = i * 100 / linenum;
+		if( perc % 10 == 0 && perc != prevperc){
+			printf("MESSAGE:%d%%\n", perc);
+			prevperc = perc;
+		}
 	}
 
 	free(buffer);
@@ -237,19 +292,22 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile){
 int main(int argc, char **argv){
 	FILE *grpfile;
 	FILE *valuefile;
+	FILE *output;
 
 	grpfile   = fopen(argv[3], "r");
 	valuefile = fopen(argv[4], "r");
+	output    = fopen(argv[5], "w");
 
 	if(!strcmp(argv[1], "onegroup")){
-		onegroup(grpfile, argv[2], valuefile);
+		onegroup(grpfile, argv[2], valuefile, output);
 	}
 	else{
-		onevalue(valuefile, argv[2], grpfile);
+		onevalue(valuefile, argv[2], grpfile, output);
 	}
 
 	fclose(grpfile);
 	fclose(valuefile);
+	fclose(output);
 
 	return(0);
 }
