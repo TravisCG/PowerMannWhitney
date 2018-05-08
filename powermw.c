@@ -6,6 +6,8 @@
 #define MAXWIDTH 10000
 #define BUFFSIZE 50000
 
+double *table; // Z-table to speed up lookup
+
 int partition(double *set, int *groups, int lo, int hi){
 	double pivot, dummy;
 	int i,j, foo;
@@ -49,6 +51,7 @@ float mid(int lo, int hi){
 	return( (hi - lo) / 2.0 + lo + 1.0);
 }
 
+/* Convert an ordered list into ranks */
 int rank(double *set, int num, double *rank){
 	int i, loindex, j, ranki;
 
@@ -84,6 +87,39 @@ int rank(double *set, int num, double *rank){
 	return(0);
 }
 
+/* Porbability density function of standard normal distribution */
+double PDF(double x){
+	return(1.0 / sqrt(2.0 * M_PI) * exp(-1.0*x*x/2));
+}
+
+/* Z-test calculation */
+double Ztest(double zscore){
+	double z, s = 0.0, prev = 0.0, actual;
+
+	for(z = -6.0; z < zscore; z+=0.0001){
+		actual = PDF(z);
+		s += 0.0001*( (prev + actual) / 2.0);
+		prev = actual;
+	}
+
+	return(s);
+}
+
+void fillZtable(){
+	double z, s = 0.0, prev = 0.0, actual;
+	int i;
+
+	table = malloc(sizeof(double) * 60000);
+
+	for(z = -6.0, i = 0; z < 0.0; z += 0.0001, i++){
+		actual = PDF(z);
+		s += 0.0001 * ( (prev + actual) / 2.0);
+		table[i] = s;
+		prev = actual;
+	}
+}
+
+/* Mann-Whitney test */
 double mannwhitney(double *set, int *groups, int num) {
 	double *r, sa = 0.0, sb = 0.0, numa = 0.0, numb = 0.0;
 	double Ua, Ub, U, z;
@@ -114,6 +150,8 @@ double mannwhitney(double *set, int *groups, int num) {
 	}
 
 	z = (U - (numa * numb / 2)) / sqrt(numa*numb*(numa+numb+1)/12.0);
+	//z = Ztest(z);
+	z = table[(int)(z + 6.0 * 10000.0)];
 
 	free(r);
 	return(z);
@@ -297,6 +335,7 @@ int main(int argc, char **argv){
 	grpfile   = fopen(argv[3], "r");
 	valuefile = fopen(argv[4], "r");
 	output    = fopen(argv[5], "w");
+	fillZtable();
 
 	if(!strcmp(argv[1], "onegroup")){
 		onegroup(grpfile, argv[2], valuefile, output);
@@ -308,6 +347,8 @@ int main(int argc, char **argv){
 	fclose(grpfile);
 	fclose(valuefile);
 	fclose(output);
+
+	free(table);
 
 	return(0);
 }
