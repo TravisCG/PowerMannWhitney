@@ -128,6 +128,10 @@ double mannwhitney(double *set, int *groups, int num) {
 			numb += 1.0;
 		}
 	}
+	if(numa == 0.0 || numb == 0.0){
+		printf("WARNING:No two groups\n");
+		return(2.0);
+	}
 
 	Ua = sa - (numa * (numa + 1.0) / 2.0);
 	Ub = sb - (numb * (numb + 1.0) / 2.0);
