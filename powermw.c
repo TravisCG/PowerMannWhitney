@@ -92,19 +92,7 @@ double PDF(double x){
 	return(1.0 / sqrt(2.0 * M_PI) * exp(-1.0*x*x/2));
 }
 
-/* Z-test calculation */
-double Ztest(double zscore){
-	double z, s = 0.0, prev = 0.0, actual;
-
-	for(z = -6.0; z < zscore; z+=0.0001){
-		actual = PDF(z);
-		s += 0.0001*( (prev + actual) / 2.0);
-		prev = actual;
-	}
-
-	return(s);
-}
-
+/* Z-test calculation. We store results in table to speed up calculations */
 void fillZtable(){
 	double z, s = 0.0, prev = 0.0, actual;
 	int i;
@@ -122,7 +110,7 @@ void fillZtable(){
 /* Mann-Whitney test */
 double mannwhitney(double *set, int *groups, int num) {
 	double *r, sa = 0.0, sb = 0.0, numa = 0.0, numb = 0.0;
-	double Ua, Ub, U, z;
+	double Ua, Ub, U, z, p;
 	int i;
 
 	r = malloc(sizeof(double) * num);
@@ -150,11 +138,10 @@ double mannwhitney(double *set, int *groups, int num) {
 	}
 
 	z = (U - (numa * numb / 2)) / sqrt(numa*numb*(numa+numb+1)/12.0);
-	//z = Ztest(z);
-	z = table[(int)(z + 6.0 * 10000.0)];
+	p = table[(int)((z + 6.0) * 10000.0)];
 
 	free(r);
-	return(z);
+	return(p);
 }
 
 void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
@@ -169,7 +156,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 	double pvalue;
 	int i;
 	int linenum = -1;
-	int prevperc;
+	int prevperc = 0;
 	int perc;
 	char found = 0;
 
@@ -254,7 +241,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 	int i;
 	int linenum = -1;
 	int perc;
-	int prevperc;
+	int prevperc = 0;
 	char found = 0;
 
 	buffer = malloc(sizeof(char) * buffsize);
@@ -325,12 +312,17 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 }
 
 /*
- * Usage: powermw onegroup|onealue rowid groupfile valuefile
+ * Usage: powermw onegroup|onevalue rowid groupfile valuefile resultfile
  */
 int main(int argc, char **argv){
 	FILE *grpfile;
 	FILE *valuefile;
 	FILE *output;
+
+	if(argc != 6){
+		printf("Usage: powermw onegroup|onevalue rowid groupfile valuefile resultfile\n");
+		return(0);
+	}
 
 	grpfile   = fopen(argv[3], "r");
 	valuefile = fopen(argv[4], "r");
