@@ -263,9 +263,9 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 				set[count] = atof(value);
 				count++;
 			}
+			found = 1;
+			break;
 		}
-		found = 1;
-		break;
 	}
 
 	if(!found){
