@@ -102,7 +102,7 @@ void fillZtable(){
 	for(z = -6.0, i = 0; z < 0.0; z += 0.0001, i++){
 		actual = PDF(z);
 		s += 0.0001 * ( (prev + actual) / 2.0);
-		table[i] = s;
+		table[i] = s * 2.0;
 		prev = actual;
 	}
 }
@@ -120,21 +120,24 @@ double mannwhitney(double *set, int *groups, int num) {
 
 	for(i = 0; i < num; i++){
 		if(groups[i] == 0){
-			sa += r[i];
+			sa += r[i]; //TODO sa can be differ in separate runs!
 			numa += 1.0;
 		}
 		else{
-			sb += r[i];
+			sb += r[i]; //TODO sb can be differ in separate runs!
 			numb += 1.0;
 		}
 	}
-	if(numa == 0.0 || numb == 0.0){
-		printf("WARNING:No two groups\n");
-		return(2.0);
-	}
+
+	free(r);
 
 	Ua = sa - (numa * (numa + 1.0) / 2.0);
 	Ub = sb - (numb * (numb + 1.0) / 2.0);
+
+	if(numa == 0.0 || numb == 0.0){
+		// Avoiding division by zero, return value is non-significant
+		return(1.0);
+	}
 
 	U = Ub;
 	if(Ua < Ub){
@@ -144,7 +147,6 @@ double mannwhitney(double *set, int *groups, int num) {
 	z = (U - (numa * numb / 2)) / sqrt(numa*numb*(numa+numb+1)/12.0);
 	p = table[(int)((z + 6.0) * 10000.0)];
 
-	free(r);
 	return(p);
 }
 
