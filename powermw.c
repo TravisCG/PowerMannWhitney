@@ -114,17 +114,17 @@ double mannwhitney(double *set, int *groups, int num) {
 	int i;
 
 	r = malloc(sizeof(double) * num);
-
 	quicksort(set, groups, 0, num-1);
+
         rank(set, num, r);
 
 	for(i = 0; i < num; i++){
 		if(groups[i] == 0){
-			sa += r[i]; //TODO sa can be differ in separate runs!
+			sa += r[i];
 			numa += 1.0;
 		}
 		else{
-			sb += r[i]; //TODO sb can be differ in separate runs!
+			sb += r[i];
 			numb += 1.0;
 		}
 	}
@@ -145,9 +145,35 @@ double mannwhitney(double *set, int *groups, int num) {
 	}
 
 	z = (U - (numa * numb / 2)) / sqrt(numa*numb*(numa+numb+1)/12.0);
+	if(z < -6.0){
+		z = -6.0;
+	}
 	p = table[(int)((z + 6.0) * 10000.0)];
 
 	return(p);
+}
+
+/* Just count the lines in a text file and revert the file pointer to the beginning */
+int countlines(FILE *f, char *buffer, int buffsize){
+	int linenum = -1;
+	while(fgets(buffer, buffsize, f) != NULL){
+		linenum++;
+	}
+	rewind(f);
+
+	return(linenum);
+}
+
+/* Simple progress inficator */
+void progress(int i, int max){
+	static int prevperc = 0;
+	int perc;
+
+	perc = i * 100 / max;
+	if( perc % 10 == 0 && perc != prevperc){
+		printf("MESSAGE:%d%%\n", perc);
+		prevperc = perc;
+	}
 }
 
 void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
@@ -156,19 +182,19 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 	char *actrowid;
 	char *value;
 	int *groups;
+	int *cpygroups;
 	int width = 0;
 	int count;
 	double *set;
 	double pvalue;
 	int i;
-	int linenum = -1;
-	int prevperc = 0;
-	int perc;
+	int linenum;
 	char found = 0;
 
-	buffer = malloc(sizeof(char) * buffsize);
-	groups = malloc(sizeof(int) * MAXWIDTH);
-	set    = malloc(sizeof(double) * MAXWIDTH);
+	buffer    = malloc(sizeof(char) * buffsize);
+	groups    = malloc(sizeof(int) * MAXWIDTH);
+	set       = malloc(sizeof(double) * MAXWIDTH);
+	cpygroups = malloc(sizeof(int) * MAXWIDTH);
 
 	while(fgets(buffer, buffsize, grpfile) != NULL){
 		actrowid = strtok(buffer, "\t");
@@ -200,10 +226,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 		return;
 	}
 
-	while(fgets(buffer, buffsize, valuefile) != NULL){
-		linenum++;
-	}
-	rewind(valuefile);
+	linenum = countlines(valuefile, buffer, buffsize);
 
 	fgets(buffer, buffsize, valuefile); // read header
 	fprintf(output, "Gene\tPvalue\n");
@@ -220,18 +243,15 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 			set[count] = atof(value);
 			count++;
 		}
-		pvalue = mannwhitney(set, groups, width);
+		memcpy(cpygroups, groups, sizeof(int) * width);
+		pvalue = mannwhitney(set, cpygroups, width);
 		fprintf(output, "%s\t%f\n", actrowid, pvalue);
-
-		perc = i * 100 / linenum;
-		if( perc % 10 == 0 && perc != prevperc){
-			printf("MESSAGE:%d%%\n", perc);
-			prevperc = perc;
-		}
+		progress(i, linenum);
 	}
 
 	free(buffer);
 	free(groups);
+	free(cpygroups);
 	free(set);
 }
 
@@ -241,17 +261,17 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 	char *actrowid;
 	int count = 0;
 	double *set;
+	double *cpyset;
 	char *value;
 	double pvalue;
 	int *groups;
 	int i;
 	int linenum = -1;
-	int perc;
-	int prevperc = 0;
 	char found = 0;
 
 	buffer = malloc(sizeof(char) * buffsize);
 	set    = malloc(sizeof(double) * MAXWIDTH);
+	cpyset = malloc(sizeof(double) * MAXWIDTH);
 	groups = malloc(sizeof(int) * MAXWIDTH);
 
 	while( fgets(buffer, buffsize, valuefile) != NULL){
@@ -274,14 +294,12 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 		printf("WARNING:Row not found\n");
 		free(buffer);
 		free(set);
+		free(cpyset);
 		free(groups);
 		return;
 	}
 
-	while(fgets(buffer, buffsize, grpfile) != NULL){
-		linenum++;
-	}
-	rewind(grpfile);
+	linenum = countlines(grpfile, buffer, buffsize);
 
 	fgets(buffer, buffsize, grpfile); // read header
 	fprintf(output, "Gene\tPvalue\n");
@@ -302,18 +320,15 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 			}
 			count++;
 		}
-		pvalue = mannwhitney(set, groups, count);
+		memcpy(cpyset, set, sizeof(double) * count);
+		pvalue = mannwhitney(cpyset, groups, count);
 		fprintf(output, "%s\t%f\n", actrowid, pvalue);
-
-		perc = i * 100 / linenum;
-		if( perc % 10 == 0 && perc != prevperc){
-			printf("MESSAGE:%d%%\n", perc);
-			prevperc = perc;
-		}
+		progress(i, linenum);
 	}
 
 	free(buffer);
 	free(set);
+	free(cpyset);
 	free(groups);
 }
 
@@ -333,6 +348,7 @@ int main(int argc, char **argv){
 	grpfile   = fopen(argv[3], "r");
 	valuefile = fopen(argv[4], "r");
 	output    = fopen(argv[5], "w");
+
 	fillZtable();
 
 	if(!strcmp(argv[1], "onegroup")){
