@@ -108,8 +108,9 @@ void fillZtable(){
 }
 
 /* Mann-Whitney test */
-double mannwhitney(double *set, int *groups, int num) {
+double mannwhitney(double *set, int *groups, int num, double *log2foldch) {
 	double *r, sa = 0.0, sb = 0.0, numa = 0.0, numb = 0.0;
+	double s1 = 0.0, s2 = 0.0;
 	double Ua, Ub, U, z, p;
 	int i;
 
@@ -121,10 +122,12 @@ double mannwhitney(double *set, int *groups, int num) {
 	for(i = 0; i < num; i++){
 		if(groups[i] == 0){
 			sa += r[i];
+			s1 += set[i];
 			numa += 1.0;
 		}
 		else{
 			sb += r[i];
+			s2 += set[i];
 			numb += 1.0;
 		}
 	}
@@ -136,6 +139,7 @@ double mannwhitney(double *set, int *groups, int num) {
 
 	if(numa == 0.0 || numb == 0.0){
 		// Avoiding division by zero, return value is non-significant
+		*log2foldch = 0.0;
 		return(1.0);
 	}
 
@@ -143,6 +147,11 @@ double mannwhitney(double *set, int *groups, int num) {
 	if(Ua < Ub){
 		U = Ua;
 	}
+
+	s1 = s1 / numa;
+	s2 = s2 / numb;
+
+	*log2foldch = log2(s1 / s2);
 
 	z = (U - (numa * numb / 2)) / sqrt(numa*numb*(numa+numb+1)/12.0);
 	if(z < -6.0){
@@ -186,7 +195,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 	int width = 0;
 	int count;
 	double *set;
-	double pvalue;
+	double pvalue, log2fc = 100.0;
 	int i;
 	int linenum;
 	char found = 0;
@@ -229,7 +238,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 	linenum = countlines(valuefile, buffer, buffsize);
 
 	fgets(buffer, buffsize, valuefile); // read header
-	fprintf(output, "Gene\tPvalue\n");
+	fprintf(output, "Gene\tlog2FC\tPvalue\n");
 	for(i = 0; i < linenum; i++){
 		fgets(buffer, buffsize, valuefile);
 		// Do MannWhitney
@@ -244,8 +253,8 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 			count++;
 		}
 		memcpy(cpygroups, groups, sizeof(int) * width);
-		pvalue = mannwhitney(set, cpygroups, width);
-		fprintf(output, "%s\t%f\n", actrowid, pvalue);
+		pvalue = mannwhitney(set, cpygroups, width, &log2fc);
+		fprintf(output, "%s\t%f\t%f\n", actrowid, log2fc, pvalue);
 		progress(i, linenum);
 	}
 
@@ -263,7 +272,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 	double *set;
 	double *cpyset;
 	char *value;
-	double pvalue;
+	double pvalue, log2fc = 100.0;
 	int *groups;
 	int i;
 	int linenum = -1;
@@ -302,7 +311,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 	linenum = countlines(grpfile, buffer, buffsize);
 
 	fgets(buffer, buffsize, grpfile); // read header
-	fprintf(output, "Gene\tPvalue\n");
+	fprintf(output, "Gene\tlog2FC\tPvalue\n");
 	for(i = 0; i < linenum; i++){
 		fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
@@ -321,8 +330,8 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 			count++;
 		}
 		memcpy(cpyset, set, sizeof(double) * count);
-		pvalue = mannwhitney(cpyset, groups, count);
-		fprintf(output, "%s\t%f\n", actrowid, pvalue);
+		pvalue = mannwhitney(cpyset, groups, count, &log2fc);
+		fprintf(output, "%s\t%f\t%f\n", actrowid, log2fc, pvalue);
 		progress(i, linenum);
 	}
 
