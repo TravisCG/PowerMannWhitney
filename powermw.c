@@ -254,6 +254,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 		}
 		memcpy(cpygroups, groups, sizeof(int) * width);
 		pvalue = mannwhitney(set, cpygroups, width, &log2fc);
+
 		fprintf(output, "%s\t%f\t%f\n", actrowid, log2fc, pvalue);
 		progress(i, linenum);
 	}
