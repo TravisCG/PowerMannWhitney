@@ -229,7 +229,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 	int *cpygroups;
 	int width = 0;
 	double *set;
-	double pvalue, log2fc = 100.0;
+	double pvalue, log2fc = 100.0, bonferroni = 1.0;
 	int i;
 	int linenum;
 	char found = 0;
@@ -260,7 +260,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 	linenum = countlines(valuefile, buffer, buffsize);
 
 	fgets(buffer, buffsize, valuefile); // read header
-	fprintf(output, "Gene\tlog2FC\tPvalue\n");
+	fprintf(output, "Gene\tlog2FC\tPvalue\tBonferroni\n");
 	for(i = 0; i < linenum; i++){
 		fgets(buffer, buffsize, valuefile);
 		// Do MannWhitney
@@ -268,8 +268,9 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 		parsevalue(set); 
 		memcpy(cpygroups, groups, sizeof(int) * width);
 		pvalue = mannwhitney(set, cpygroups, width, &log2fc);
-
-		fprintf(output, "%s\t%f\t%f\n", actrowid, log2fc, pvalue);
+		bonferroni = pvalue * linenum;
+		if(bonferroni > 1.0) bonferroni = 1.0;
+		fprintf(output, "%s\t%f\t%f\t%f\n", actrowid, log2fc, pvalue, bonferroni);
 		progress(i, linenum);
 	}
 
@@ -286,7 +287,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 	int count = 0;
 	double *set;
 	double *cpyset;
-	double pvalue, log2fc = 100.0;
+	double pvalue, log2fc = 100.0, bonferroni = 1.0;
 	int *groups;
 	int i;
 	int linenum = -1;
@@ -318,7 +319,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 	linenum = countlines(grpfile, buffer, buffsize);
 
 	fgets(buffer, buffsize, grpfile); // read header
-	fprintf(output, "Gene\tlog2FC\tPvalue\n");
+	fprintf(output, "Gene\tlog2FC\tPvalue\tBonferroni\n");
 	for(i = 0; i < linenum; i++){
 		fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
@@ -326,7 +327,9 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 
 		memcpy(cpyset, set, sizeof(double) * count);
 		pvalue = mannwhitney(cpyset, groups, count, &log2fc);
-		fprintf(output, "%s\t%f\t%f\n", actrowid, log2fc, pvalue);
+		bonferroni = pvalue * linenum;
+		if(bonferroni > 1.0) bonferroni = 1.0;
+		fprintf(output, "%s\t%f\t%f\t%f\n", actrowid, log2fc, pvalue, bonferroni);
 		progress(i, linenum);
 	}
 
