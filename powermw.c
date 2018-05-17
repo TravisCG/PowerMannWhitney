@@ -101,8 +101,8 @@ void fillZtable(){
 
 	for(z = -6.0, i = 0; z < 0.0; z += 0.0001, i++){
 		actual = PDF(z);
-		s += 0.0001 * ( (prev + actual) / 2.0);
-		table[i] = s * 2.0;
+		s += 0.0001 * ( (prev + actual) / 2.0); // Numerical integral calculation
+		table[i] = s * 2.0; // Two-tail p value
 		prev = actual;
 	}
 }
@@ -185,15 +185,49 @@ void progress(int i, int max){
 	}
 }
 
+int parsegroup(int *groups){
+	int count = 0;
+	char *value;
+
+	while(1){
+		value = strtok(NULL, "\t\n");
+		if(value == NULL){
+			break;
+		}
+		if(!strcmp(value, "1")){
+			groups[count] = 1;
+		}
+		else{
+			groups[count] = 0;
+		}
+		count++;
+	}
+
+	return(count);
+}
+
+int parsevalue(double *set){
+	int count = 0;
+	char *value;
+
+	while(1){
+		value = strtok(NULL, "\t\n");
+		if(value == NULL){
+			break;
+		}
+		set[count] = strtod(value, NULL);
+		count++;
+	}
+	return(count);
+}
+
 void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 	char *buffer;
 	int buffsize = BUFFSIZE;
 	char *actrowid;
-	char *value;
 	int *groups;
 	int *cpygroups;
 	int width = 0;
-	int count;
 	double *set;
 	double pvalue, log2fc = 100.0;
 	int i;
@@ -209,19 +243,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 		actrowid = strtok(buffer, "\t");
 		if(!strcmp(actrowid, rowid)){
 			// extract group information
-			while(1){
-				value = strtok(NULL, "\t\n");
-				if(value == NULL){
-					break;
-				}
-				if(!strcmp(value, "1")){
-					groups[width] = 1;
-				}
-				else{
-					groups[width] = 0;
-				}
-				width++;
-			};
+			width = parsegroup(groups);
 			found = 1;
 			break;
 		}
@@ -243,15 +265,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 		fgets(buffer, buffsize, valuefile);
 		// Do MannWhitney
 		actrowid = strtok(buffer, "\t");
-		count = 0;
-		while(1){
-			value = strtok(NULL, "\t\n");
-			if(value == NULL){
-				break;
-			}
-			set[count] = atof(value);
-			count++;
-		}
+		parsevalue(set); 
 		memcpy(cpygroups, groups, sizeof(int) * width);
 		pvalue = mannwhitney(set, cpygroups, width, &log2fc);
 
@@ -272,7 +286,6 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 	int count = 0;
 	double *set;
 	double *cpyset;
-	char *value;
 	double pvalue, log2fc = 100.0;
 	int *groups;
 	int i;
@@ -287,17 +300,10 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 	while( fgets(buffer, buffsize, valuefile) != NULL){
 		actrowid = strtok(buffer, "\t");
 		if(!strcmp(actrowid, rowid)){
-			while(1){
-				value = strtok(NULL, "\t\n");
-				if(value == NULL){
-					break;
-				}
-				set[count] = atof(value);
-				count++;
-			}
 			found = 1;
 			break;
 		}
+		count = parsevalue(set);
 	}
 
 	if(!found){
@@ -316,20 +322,8 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 	for(i = 0; i < linenum; i++){
 		fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
-		count = 0;
-		while(1){
-			value = strtok(NULL, "\t\n");
-			if(value == NULL){
-				break;
-			}
-			if(!strcmp(value, "1")){
-				groups[count] = 1;
-			}
-			else{
-				groups[count] = 0;
-			}
-			count++;
-		}
+		count = parsegroup(groups);
+
 		memcpy(cpyset, set, sizeof(double) * count);
 		pvalue = mannwhitney(cpyset, groups, count, &log2fc);
 		fprintf(output, "%s\t%f\t%f\n", actrowid, log2fc, pvalue);
