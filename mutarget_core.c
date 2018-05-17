@@ -7,6 +7,7 @@
 #define BUFFSIZE 50000
 
 double *table; // Z-table to speed up lookup
+enum filtertype {none, include, exclude};
 
 int partition(double *set, int *groups, int lo, int hi){
 	double pivot, dummy;
@@ -180,7 +181,7 @@ void progress(int i, int max){
 
 	perc = i * 100 / max;
 	if( perc % 10 == 0 && perc != prevperc){
-		printf("%d%%\n", perc);
+		printf("MESSAGE:%d%%\n", perc);
 		prevperc = perc;
 	}
 }
@@ -221,7 +222,7 @@ int parsevalue(double *set){
 	return(count);
 }
 
-void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
+void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum filtertype f, char *rowid2){
 	char *buffer;
 	int buffsize = BUFFSIZE;
 	char *actrowid;
@@ -250,7 +251,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 	}
 
 	if(!found){
-		fprintf(stderr, "Row not found\n");
+		printf("WARNING:Row not found\n");
 		free(buffer);
 		free(groups);
 		free(set);
@@ -281,7 +282,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 	free(set);
 }
 
-void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
+void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum filtertype f, char *rowid2, int mutprevalence){
 	char *buffer;
 	int buffsize = BUFFSIZE;
 	char *actrowid;
@@ -309,7 +310,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 	}
 
 	if(!found){
-		fprintf(stderr, "Row not found\n");
+		printf("WARNING:Row not found\n");
 		free(buffer);
 		free(set);
 		free(cpyset);
@@ -347,23 +348,38 @@ int main(int argc, char **argv){
 	FILE *grpfile;
 	FILE *valuefile;
 	FILE *output;
+	char *rowid2;
+	enum filtertype filter;
 
-	if(argc != 6){
-		printf("Usage: powermw onegroup|onevalue rowid groupfile valuefile resultfile\n");
+	if(argc < 6){
+		printf("Usage: powermw onegroup|onevalue rowid groupfile valuefile resultfile include|exclude rowid2 mutprevalence\n");
 		return(0);
 	}
 
 	grpfile   = fopen(argv[3], "r");
 	valuefile = fopen(argv[4], "r");
 	output    = fopen(argv[5], "w");
+	if(argc == 8 && !strcmp(argv[6], "exclude")){
+		filter = exclude;
+		rowid2 = argv[7];
+	} 
+	else if(argc == 8 && !strcmp(argv[6], "include")){
+		filter = include;
+		rowid2 = argv[7];
+	}
+	else{
+		filter = none;
+		rowid2 = NULL;
+	}
+
 
 	fillZtable();
 
 	if(!strcmp(argv[1], "onegroup")){
-		onegroup(grpfile, argv[2], valuefile, output);
+		onegroup(grpfile, argv[2], valuefile, output, filter, rowid2);
 	}
 	else{
-		onevalue(valuefile, argv[2], grpfile, output);
+		onevalue(valuefile, argv[2], grpfile, output, filter, rowid2, atoi(argv[8]));
 	}
 
 	fclose(grpfile);
