@@ -254,6 +254,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 		free(buffer);
 		free(groups);
 		free(set);
+		free(cpygroups);
 		return;
 	}
 
