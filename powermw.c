@@ -185,7 +185,7 @@ void progress(int i, int max){
 	}
 }
 
-int parsegroup(int *groups){
+inline int parsegroup(int *groups){
 	int count = 0;
 	char *value;
 
@@ -206,7 +206,7 @@ int parsegroup(int *groups){
 	return(count);
 }
 
-int parsevalue(double *set){
+inline int parsevalue(double *set){
 	int count = 0;
 	char *value;
 
