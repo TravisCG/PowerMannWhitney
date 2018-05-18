@@ -194,7 +194,7 @@ int parsegroup(int *groups){
 		if(value == NULL){
 			break;
 		}
-		if(!strcmp(value, "1")){
+		if(value[0] == '1'){
 			groups[count] = 1;
 		}
 		else{

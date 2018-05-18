@@ -1,5 +1,9 @@
 # PowerMannWhitney
-Highly optimized Mann-Whitney calculator for large data. It is using Bonferroni correction,
+
+A large number of life scientist cannot understand statistics properly and they use
+only non-parametric tests for eveything. Mann-Whitney test is one of them.
+
+PowerMannWhitney is a highly optimized Mann-Whitney calculator for large data. It is using Bonferroni correction,
 because I would like to avoid sorting the results.
 
 ## Usage
@@ -28,5 +32,13 @@ multiple rows with the same ID!
 Tab separated matrix files. The groupfile is a binary matrix. This specify the two groups
 for the Mann-Whitney test.
 
-There is an alternative version, which is used in www.mutarget.com. It has some additional
-filtering option.
+## Alternatives
+
+There is an alternative version (mutarget_core.c), which is used in www.mutarget.com. It has some additional
+filtering options. I do not recommend the usage of this version in a standalone environment.
+
+## Compiling
+
+Simply type:
+
+'''gcc powermw.c -lm -O3 -o powermw'''

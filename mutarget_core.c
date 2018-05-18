@@ -195,7 +195,7 @@ int parsegroup(int *groups){
 		if(value == NULL){
 			break;
 		}
-		if(!strcmp(value, "1")){
+		if(value[0] == '1'){
 			groups[count] = 1;
 		}
 		else{
@@ -222,8 +222,28 @@ int parsevalue(double *set){
 	return(count);
 }
 
+int parseimpcol(char *cols, enum filtertype f){
+	int count = 0;
+	char *value;
+
+	while(1){
+		value = strtok(NULL, "\t\n");
+		if(value == NULL){
+			break;
+		}
+		if( (value[0] == '1' && f == include) || (value[0] == '0' && f == exclude)){
+			cols[count] = 1;
+			count++;
+		}
+		else{
+			cols[count] = 0;
+		}
+	}
+	return(count);
+}
+
 void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum filtertype f, char *rowid2){
-	char *buffer;
+	char *buffer, *importantcols;
 	int buffsize = BUFFSIZE;
 	char *actrowid;
 	int *groups;
@@ -232,25 +252,37 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	double *set;
 	double pvalue, log2fc = 100.0, bonferroni = 1.0;
 	int i;
-	int linenum;
-	char found = 0;
+	int linenum, impcolcount = 0;
+	char foundr1 = 0, foundr2 = 1;
 
 	buffer    = malloc(sizeof(char) * buffsize);
 	groups    = malloc(sizeof(int) * MAXWIDTH);
 	set       = malloc(sizeof(double) * MAXWIDTH);
 	cpygroups = malloc(sizeof(int) * MAXWIDTH);
+	importantcols = malloc(sizeof(char) * MAXWIDTH);
+
+	if(f != none){
+		foundr2 = 0;
+	}
 
 	while(fgets(buffer, buffsize, grpfile) != NULL){
 		actrowid = strtok(buffer, "\t");
 		if(!strcmp(actrowid, rowid)){
 			// extract group information
 			width = parsegroup(groups);
-			found = 1;
+			foundr1 = 1;
+		}
+		if(f != none && !strcmp(actrowid, rowid2)){
+			impcolcount = parseimpcol(importantcols, f);
+			printf("%d\n", impcolcount);
+			foundr2 = 1;
+		}
+		if(foundr1 == 1 && foundr2 == 1){
 			break;
 		}
 	}
 
-	if(!found){
+	if(!foundr1 || !foundr2){
 		printf("WARNING:Row not found\n");
 		free(buffer);
 		free(groups);
