@@ -109,7 +109,7 @@ void fillZtable(){
 }
 
 /* Mann-Whitney test */
-double mannwhitney(double *set, int *groups, int num, double *log2foldch) {
+double mannwhitney(double *set, int *groups, int num, double *log2foldch, enum filtertype f, char *filtcols) {
 	double *r, sa = 0.0, sb = 0.0, numa = 0.0, numb = 0.0;
 	double s1 = 0.0, s2 = 0.0;
 	double Ua, Ub, U, z, p;
@@ -121,6 +121,10 @@ double mannwhitney(double *set, int *groups, int num, double *log2foldch) {
         rank(set, num, r);
 
 	for(i = 0; i < num; i++){
+		if(f != none && filtcols[i] == 0){
+			// Skip columns
+			continue;
+		}
 		if(groups[i] == 0){
 			sa += r[i];
 			s1 += set[i];
@@ -274,7 +278,6 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		}
 		if(f != none && !strcmp(actrowid, rowid2)){
 			impcolcount = parseimpcol(importantcols, f);
-			printf("%d\n", impcolcount);
 			foundr2 = 1;
 		}
 		if(foundr1 == 1 && foundr2 == 1){
@@ -288,6 +291,17 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		free(groups);
 		free(set);
 		free(cpygroups);
+		free(importantcols);
+		return;
+	}
+
+	if(f != none && impcolcount < 20){
+		printf("WARNING:Number of samples less than 20\n");
+		free(buffer);
+		free(groups);
+		free(set);
+		free(cpygroups);
+		free(importantcols);
 		return;
 	}
 
@@ -301,7 +315,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		actrowid = strtok(buffer, "\t");
 		parsevalue(set); 
 		memcpy(cpygroups, groups, sizeof(int) * width);
-		pvalue = mannwhitney(set, cpygroups, width, &log2fc);
+		pvalue = mannwhitney(set, cpygroups, width, &log2fc, f, importantcols);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
 		fprintf(output, "%s\t%f\t%f\t%f\n", actrowid, log2fc, pvalue, bonferroni);
@@ -312,10 +326,11 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	free(groups);
 	free(cpygroups);
 	free(set);
+	free(importantcols);
 }
 
 void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum filtertype f, char *rowid2, int mutprevalence){
-	char *buffer;
+	char *buffer, *importantcols;
 	int buffsize = BUFFSIZE;
 	char *actrowid;
 	int count = 0;
@@ -331,6 +346,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	set    = malloc(sizeof(double) * MAXWIDTH);
 	cpyset = malloc(sizeof(double) * MAXWIDTH);
 	groups = malloc(sizeof(int) * MAXWIDTH);
+	importantcols = malloc(sizeof(char) * MAXWIDTH);
 
 	while( fgets(buffer, buffsize, valuefile) != NULL){
 		actrowid = strtok(buffer, "\t");
@@ -347,6 +363,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		free(set);
 		free(cpyset);
 		free(groups);
+		free(importantcols);
 		return;
 	}
 
@@ -360,7 +377,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		count = parsegroup(groups);
 
 		memcpy(cpyset, set, sizeof(double) * count);
-		pvalue = mannwhitney(cpyset, groups, count, &log2fc);
+		pvalue = mannwhitney(cpyset, groups, count, &log2fc, f, importantcols);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
 		fprintf(output, "%s\t%f\t%f\t%f\n", actrowid, log2fc, pvalue, bonferroni);
@@ -371,6 +388,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	free(set);
 	free(cpyset);
 	free(groups);
+	free(importantcols);
 }
 
 /*
