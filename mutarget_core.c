@@ -129,11 +129,13 @@ double mannwhitney(double *set, int *groups, int num, double *log2foldch, enum f
 			sa += r[i];
 			s1 += set[i];
 			numa += 1.0;
+			printf("%d:0\n", i);
 		}
 		else{
 			sb += r[i];
 			s2 += set[i];
 			numb += 1.0;
+			printf("%d:1\n", i);
 		}
 	}
 
@@ -162,6 +164,9 @@ double mannwhitney(double *set, int *groups, int num, double *log2foldch, enum f
 	if(z < -6.0){
 		z = -6.0;
 	}
+	if(z > 0.0){
+		z = 0.0;
+	}
 	p = table[(int)((z + 6.0) * 10000.0)];
 
 	return(p);
@@ -174,6 +179,49 @@ int countlines(FILE *f, char *buffer, int buffsize){
 		linenum++;
 	}
 	rewind(f);
+
+	return(linenum);
+}
+
+/* Just count the lines in a text file and revert the file pointer to the beginning */
+int countlineswithfilter(FILE *f, char *buffer, int buffsize, enum filtertype filt, char *rowid2, char *impcols){
+	int linenum = -1, cols = 0, impcolnum = 0;
+	char *fields;
+	char found = 0;
+
+	while(fgets(buffer, buffsize, f) != NULL){
+		linenum++;
+		if(filt != none){
+			fields = strtok(buffer, "\t");
+			if(!strcmp(fields, rowid2)){
+				while(1){
+					fields = strtok(NULL, "\t\n");
+					if(fields == NULL){
+						break;
+					}
+					if( (fields[0] == '1' && filt == include) || (fields[0] == '0' && filt == exclude)){
+						impcols[cols] = 1;
+						impcolnum++;
+					}
+					else{
+						impcols[cols] = 0;
+					}
+					cols++;
+				}
+				found = 1;
+			}
+		}
+	}
+	rewind(f);
+
+	if(filt != none && found == 0){
+		printf("WARNING:Filter gene not found\n");
+		return(-1);
+	}
+	if(filt != none && impcolnum < 20){
+		printf("WARNING:Sample number is less than 20\n");
+		return(-2);
+	}
 
 	return(linenum);
 }
@@ -367,7 +415,15 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		return;
 	}
 
-	linenum = countlines(grpfile, buffer, buffsize);
+	linenum = countlineswithfilter(grpfile, buffer, buffsize, f, rowid2, importantcols);
+	if(linenum < 0){
+		free(buffer);
+		free(set);
+		free(cpyset);
+		free(groups);
+		free(importantcols);
+		return;
+	}
 
 	fgets(buffer, buffsize, grpfile); // read header
 	fprintf(output, "Gene\tlog2FC\tPvalue\tBonferroni\n");
@@ -409,11 +465,11 @@ int main(int argc, char **argv){
 	grpfile   = fopen(argv[3], "r");
 	valuefile = fopen(argv[4], "r");
 	output    = fopen(argv[5], "w");
-	if(argc == 8 && !strcmp(argv[6], "exclude")){
+	if(argc >= 8 && !strcmp(argv[6], "exclude")){
 		filter = exclude;
 		rowid2 = argv[7];
 	} 
-	else if(argc == 8 && !strcmp(argv[6], "include")){
+	else if(argc >= 8 && !strcmp(argv[6], "include")){
 		filter = include;
 		rowid2 = argv[7];
 	}
