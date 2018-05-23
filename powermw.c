@@ -271,7 +271,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 		pvalue = mannwhitney(set, cpygroups, width, &log2fc);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
-		fprintf(output, "%s\t%f\t%f\t%f\n", actrowid, log2fc, pvalue, bonferroni);
+		fprintf(output, "%s\t%.5e\t%.5e\t%.5e\n", actrowid, log2fc, pvalue, bonferroni);
 		progress(i, linenum);
 	}
 
@@ -330,7 +330,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 		pvalue = mannwhitney(cpyset, groups, count, &log2fc);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
-		fprintf(output, "%s\t%f\t%f\t%f\n", actrowid, log2fc, pvalue, bonferroni);
+		fprintf(output, "%s\t%.5e\t%.5e\t%.5e\n", actrowid, log2fc, pvalue, bonferroni);
 		progress(i, linenum);
 	}
 

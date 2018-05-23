@@ -125,13 +125,11 @@ double mannwhitney(double *set, int *groups, int num, double *log2foldch) {
 			sa += r[i];
 			s1 += set[i];
 			numa += 1.0;
-			printf("%f:0\n", set[i]);
 		}
 		else{
 			sb += r[i];
 			s2 += set[i];
 			numb += 1.0;
-			printf("%f:1\n", set[i]);
 		}
 	}
 
@@ -385,7 +383,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		pvalue = mannwhitney(set, cpygroups, width, &log2fc);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
-		fprintf(output, "%s\t%f\t%f\t%f\n", actrowid, log2fc, pvalue, bonferroni);
+		fprintf(output, "%s\t%.10e\t%.10e\t%.10e\n", actrowid, log2fc, pvalue, bonferroni);
 		progress(i, linenum);
 	}
 
@@ -457,7 +455,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		pvalue = mannwhitney(cpyset, groups, count, &log2fc);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
-		fprintf(output, "%s\t%f\t%f\t%f\n", actrowid, log2fc, pvalue, bonferroni);
+		fprintf(output, "%s\t%.10e\t%.10e\t%.10e\n", actrowid, log2fc, pvalue, bonferroni);
 		progress(i, linenum);
 	}
 
