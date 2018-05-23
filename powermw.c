@@ -302,10 +302,10 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 	while( fgets(buffer, buffsize, valuefile) != NULL){
 		actrowid = strtok(buffer, "\t");
 		if(!strcmp(actrowid, rowid)){
+			count = parsevalue(set);
 			found = 1;
 			break;
 		}
-		count = parsevalue(set);
 	}
 
 	if(!found){

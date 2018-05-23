@@ -109,7 +109,7 @@ void fillZtable(){
 }
 
 /* Mann-Whitney test */
-double mannwhitney(double *set, int *groups, int num, double *log2foldch, enum filtertype f, char *filtcols) {
+double mannwhitney(double *set, int *groups, int num, double *log2foldch) {
 	double *r, sa = 0.0, sb = 0.0, numa = 0.0, numb = 0.0;
 	double s1 = 0.0, s2 = 0.0;
 	double Ua, Ub, U, z, p;
@@ -121,21 +121,17 @@ double mannwhitney(double *set, int *groups, int num, double *log2foldch, enum f
         rank(set, num, r);
 
 	for(i = 0; i < num; i++){
-		if(f != none && filtcols[i] == 0){
-			// Skip columns
-			continue;
-		}
 		if(groups[i] == 0){
 			sa += r[i];
 			s1 += set[i];
 			numa += 1.0;
-			printf("%d:0\n", i);
+			printf("%f:0\n", set[i]);
 		}
 		else{
 			sb += r[i];
 			s2 += set[i];
 			numb += 1.0;
-			printf("%d:1\n", i);
+			printf("%f:1\n", set[i]);
 		}
 	}
 
@@ -285,13 +281,33 @@ int parseimpcol(char *cols, enum filtertype f){
 		}
 		if( (value[0] == '1' && f == include) || (value[0] == '0' && f == exclude)){
 			cols[count] = 1;
-			count++;
 		}
 		else{
 			cols[count] = 0;
 		}
+		count++;
 	}
 	return(count);
+}
+
+int reorder(double *set, int *groups, char *impcols, int width){
+	int i, j = 0;
+	double d1;
+	char d2;
+
+	for(i = 0; i < width; i++){
+		if(impcols[i] == 1){
+			d1 = set[i];
+			set[i] = set[j];
+			set[j] = d1;
+
+			d2 = groups[i];
+			groups[i] = groups[j];
+			groups[j] = d2;
+			j++;
+		}
+	}
+	return(j);
 }
 
 void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum filtertype f, char *rowid2){
@@ -361,9 +377,12 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		fgets(buffer, buffsize, valuefile);
 		// Do MannWhitney
 		actrowid = strtok(buffer, "\t");
-		parsevalue(set); 
+		width = parsevalue(set);
 		memcpy(cpygroups, groups, sizeof(int) * width);
-		pvalue = mannwhitney(set, cpygroups, width, &log2fc, f, importantcols);
+		if(f != none){
+			width = reorder(set, cpygroups, importantcols, width);
+		}
+		pvalue = mannwhitney(set, cpygroups, width, &log2fc);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
 		fprintf(output, "%s\t%f\t%f\t%f\n", actrowid, log2fc, pvalue, bonferroni);
@@ -399,10 +418,10 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	while( fgets(buffer, buffsize, valuefile) != NULL){
 		actrowid = strtok(buffer, "\t");
 		if(!strcmp(actrowid, rowid)){
+			count = parsevalue(set);
 			found = 1;
 			break;
 		}
-		count = parsevalue(set);
 	}
 
 	if(!found){
@@ -431,9 +450,11 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
 		count = parsegroup(groups);
-
 		memcpy(cpyset, set, sizeof(double) * count);
-		pvalue = mannwhitney(cpyset, groups, count, &log2fc, f, importantcols);
+		if(f != none){
+			count = reorder(cpyset, groups, importantcols, count);
+		}
+		pvalue = mannwhitney(cpyset, groups, count, &log2fc);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
 		fprintf(output, "%s\t%f\t%f\t%f\n", actrowid, log2fc, pvalue, bonferroni);
