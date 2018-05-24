@@ -35,10 +35,11 @@ for the Mann-Whitney test.
 ## Alternatives
 
 There is an alternative version (mutarget_core.c), which is used in www.mutarget.com. It has some additional
-filtering options. I do not recommend the usage of this version in a standalone environment.
+filtering options. I do not recommend the usage of this version in a standalone environment, because it is
+optimized for the website.
 
 ## Compiling
 
 Simply type:
 
-'''gcc powermw.c -lm -O3 -o powermw'''
+'''gcc powermw.c -lm -W -Wall -pedantic -O3 -o powermw'''

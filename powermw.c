@@ -260,10 +260,10 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output){
 
 	linenum = countlines(valuefile, buffer, buffsize);
 
-	fgets(buffer, buffsize, valuefile); // read header
+	buffer = fgets(buffer, buffsize, valuefile); // read header
 	fprintf(output, "Gene\tlog2FC\tPvalue\tBonferroni\n");
 	for(i = 0; i < linenum; i++){
-		fgets(buffer, buffsize, valuefile);
+		buffer = fgets(buffer, buffsize, valuefile);
 		// Do MannWhitney
 		actrowid = strtok(buffer, "\t");
 		parsevalue(set); 
@@ -319,10 +319,10 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output){
 
 	linenum = countlines(grpfile, buffer, buffsize);
 
-	fgets(buffer, buffsize, grpfile); // read header
+	buffer = fgets(buffer, buffsize, grpfile); // read header
 	fprintf(output, "Gene\tlog2FC\tPvalue\tBonferroni\n");
 	for(i = 0; i < linenum; i++){
-		fgets(buffer, buffsize, grpfile);
+		buffer = fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
 		count = parsegroup(groups);
 

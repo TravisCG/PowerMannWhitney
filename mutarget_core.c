@@ -308,6 +308,19 @@ int reorder(double *set, int *groups, char *impcols, int width){
 	return(j);
 }
 
+// Calculate the ratio of mutant samples
+int calcmutprev(int *groups, int count){
+	int i, mut = 0;
+
+	for(i = 0; i < count; i++){
+		if(groups[i] == 1){
+			mut++;
+		}
+	}
+
+	return(mut * 100 / count);
+}
+
 void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum filtertype f, char *rowid2){
 	char *buffer, *importantcols;
 	int buffsize = BUFFSIZE;
@@ -369,10 +382,10 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 
 	linenum = countlines(valuefile, buffer, buffsize);
 
-	fgets(buffer, buffsize, valuefile); // read header
+	buffer = fgets(buffer, buffsize, valuefile); // read header
 	fprintf(output, "Gene\tlog2FC\tPvalue\tBonferroni\n");
 	for(i = 0; i < linenum; i++){
-		fgets(buffer, buffsize, valuefile);
+		buffer = fgets(buffer, buffsize, valuefile);
 		// Do MannWhitney
 		actrowid = strtok(buffer, "\t");
 		width = parsevalue(set);
@@ -394,7 +407,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	free(importantcols);
 }
 
-void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum filtertype f, char *rowid2, int mutprevalence){
+void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum filtertype f, char *rowid2){
 	char *buffer, *importantcols;
 	int buffsize = BUFFSIZE;
 	char *actrowid;
@@ -403,7 +416,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	double *cpyset;
 	double pvalue, log2fc = 100.0, bonferroni = 1.0;
 	int *groups;
-	int i;
+	int i, mutprev;
 	int linenum = -1;
 	char found = 0;
 
@@ -442,20 +455,22 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		return;
 	}
 
-	fgets(buffer, buffsize, grpfile); // read header
-	fprintf(output, "Gene\tlog2FC\tPvalue\tBonferroni\n");
+	buffer = fgets(buffer, buffsize, grpfile); // read header
+	fprintf(output, "Gene\tMutPrevalence\tlog2FC\tPvalue\tBonferroni\n");
 	for(i = 0; i < linenum; i++){
-		fgets(buffer, buffsize, grpfile);
+		buffer = fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
 		count = parsegroup(groups);
 		memcpy(cpyset, set, sizeof(double) * count);
 		if(f != none){
 			count = reorder(cpyset, groups, importantcols, count);
 		}
+
+		mutprev = calcmutprev(groups, count);
 		pvalue = mannwhitney(cpyset, groups, count, &log2fc);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
-		fprintf(output, "%s\t%.10e\t%.10e\t%.10e\n", actrowid, log2fc, pvalue, bonferroni);
+		fprintf(output, "%s\t%d%%\t%.10e\t%.10e\t%.10e\n", actrowid, mutprev, log2fc, pvalue, bonferroni);
 		progress(i, linenum);
 	}
 
@@ -477,7 +492,7 @@ int main(int argc, char **argv){
 	enum filtertype filter;
 
 	if(argc < 6){
-		printf("Usage: powermw onegroup|onevalue rowid groupfile valuefile resultfile include|exclude rowid2 mutprevalence\n");
+		printf("Usage: powermw onegroup|onevalue rowid groupfile valuefile resultfile include|exclude|none rowid2\n");
 		return(0);
 	}
 
@@ -504,7 +519,7 @@ int main(int argc, char **argv){
 		onegroup(grpfile, argv[2], valuefile, output, filter, rowid2);
 	}
 	else{
-		onevalue(valuefile, argv[2], grpfile, output, filter, rowid2, atoi(argv[8]));
+		onevalue(valuefile, argv[2], grpfile, output, filter, rowid2);
 	}
 
 	fclose(grpfile);
