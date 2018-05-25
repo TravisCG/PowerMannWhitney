@@ -9,6 +9,14 @@
 double *table; // Z-table to speed up lookup
 enum filtertype {none, include, exclude};
 
+typedef struct Result {
+	char genename[30];
+	double log2FC;
+	double p;
+	double FWER;
+	int mutprev;
+} Result;
+
 int partition(double *set, int *groups, int lo, int hi){
 	double pivot, dummy;
 	int i,j, foo;
@@ -45,6 +53,40 @@ void quicksort(double *set, int *groups, int lo, int hi){
 		p = partition(set, groups, lo, hi);
 		quicksort(set, groups, lo, p - 1);
 		quicksort(set, groups, p + 1, hi);
+	}
+}
+
+void swapres(Result *r, int i, int j){
+	Result dummy;
+
+	dummy = r[i];
+	r[i]  = r[j];
+	r[j]  = dummy;
+}
+
+int partres(Result *r, int lo, int hi){
+	double pivot;
+	int i, j;
+
+	pivot = r[hi].FWER;
+	i = lo - 1;
+	for(j = lo; j < hi; j++){
+		if(r[j].FWER < pivot){
+			i++;
+			swapres(r, i, j);
+		}
+	}
+	swapres(r, i + 1, hi);
+	return(i+1);
+}
+
+void sortresult(Result *r, int lo, int hi){
+	int p;
+
+	if(lo < hi){
+		p = partres(r, lo, hi);
+		sortresult(r, lo, p - 1);
+		sortresult(r, p + 1, hi);
 	}
 }
 
@@ -321,6 +363,14 @@ int calcmutprev(int *groups, int count){
 	return(mut * 100 / count);
 }
 
+void storeres(Result *r, char *rowid, double log2fc, double p, double adjp, int m){
+	strcpy(r->genename, rowid);
+	r->log2FC  = log2fc;
+	r->p       = p;
+	r->FWER    = adjp;
+	r->mutprev = m;
+}
+
 void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum filtertype f, char *rowid2){
 	char *buffer, *importantcols;
 	int buffsize = BUFFSIZE;
@@ -333,17 +383,25 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	int i;
 	int linenum, impcolcount = 0;
 	char foundr1 = 0, foundr2 = 1;
+	Result *res;
+	int resnum = 0;
 
-	buffer    = malloc(sizeof(char) * buffsize);
-	groups    = malloc(sizeof(int) * MAXWIDTH);
-	set       = malloc(sizeof(double) * MAXWIDTH);
-	cpygroups = malloc(sizeof(int) * MAXWIDTH);
+	buffer        = malloc(sizeof(char) * buffsize);
+	groups        = malloc(sizeof(int) * MAXWIDTH);
+	set           = malloc(sizeof(double) * MAXWIDTH);
+	cpygroups     = malloc(sizeof(int) * MAXWIDTH);
 	importantcols = malloc(sizeof(char) * MAXWIDTH);
+
+	printf("MESSAGE:Measure input size\n");
+	linenum = countlines(valuefile, buffer, buffsize);
+
+	res = malloc(sizeof(Result) * linenum);
 
 	if(f != none){
 		foundr2 = 0;
 	}
 
+	printf("MESSAGE:Finding gene\n");
 	while(fgets(buffer, buffsize, grpfile) != NULL){
 		actrowid = strtok(buffer, "\t");
 		if(!strcmp(actrowid, rowid)){
@@ -362,25 +420,13 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 
 	if(!foundr1 || !foundr2){
 		printf("WARNING:Row not found\n");
-		free(buffer);
-		free(groups);
-		free(set);
-		free(cpygroups);
-		free(importantcols);
-		return;
+		goto end;
 	}
 
 	if(f != none && impcolcount < 20){
 		printf("WARNING:Number of samples less than 20\n");
-		free(buffer);
-		free(groups);
-		free(set);
-		free(cpygroups);
-		free(importantcols);
-		return;
+		goto end;
 	}
-
-	linenum = countlines(valuefile, buffer, buffsize);
 
 	buffer = fgets(buffer, buffsize, valuefile); // read header
 	fprintf(output, "Gene\tlog2FC\tPvalue\tBonferroni\n");
@@ -396,10 +442,18 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		pvalue = mannwhitney(set, cpygroups, width, &log2fc);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
-		fprintf(output, "%s\t%.10e\t%.10e\t%.10e\n", actrowid, log2fc, pvalue, bonferroni);
+		//fprintf(output, "%s\t%.10e\t%.10e\t%.10e\n", actrowid, log2fc, pvalue, bonferroni);
+		storeres(&res[resnum], actrowid, log2fc, pvalue, bonferroni, 0);
+		resnum++;
 		progress(i, linenum);
 	}
 
+	sortresult(res, 0, resnum-1);
+	for(i = 0; i < resnum; i++){
+		fprintf(output, "%s\t%.10e\t%.10e\t%.10e\n", res[i].genename, res[i].log2FC, res[i].p, res[i].FWER);
+	}
+end:
+	free(res);
 	free(buffer);
 	free(groups);
 	free(cpygroups);
@@ -419,6 +473,8 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	int i, mutprev;
 	int linenum = -1;
 	char found = 0;
+	Result *res;
+	int resnum = 0;
 
 	buffer = malloc(sizeof(char) * buffsize);
 	set    = malloc(sizeof(double) * MAXWIDTH);
@@ -426,6 +482,14 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	groups = malloc(sizeof(int) * MAXWIDTH);
 	importantcols = malloc(sizeof(char) * MAXWIDTH);
 
+	printf("MESSAGE:Measure input size\n");
+	linenum = countlineswithfilter(grpfile, buffer, buffsize, f, rowid2, importantcols);
+	if(linenum < 0){
+		goto end;
+	}
+	res = malloc(sizeof(Result) * linenum);
+
+	printf("MESSAGE:Finding gene\n");
 	while( fgets(buffer, buffsize, valuefile) != NULL){
 		actrowid = strtok(buffer, "\t");
 		if(!strcmp(actrowid, rowid)){
@@ -437,26 +501,11 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 
 	if(!found){
 		printf("WARNING:Row not found\n");
-		free(buffer);
-		free(set);
-		free(cpyset);
-		free(groups);
-		free(importantcols);
-		return;
-	}
-
-	linenum = countlineswithfilter(grpfile, buffer, buffsize, f, rowid2, importantcols);
-	if(linenum < 0){
-		free(buffer);
-		free(set);
-		free(cpyset);
-		free(groups);
-		free(importantcols);
-		return;
+		goto end;
 	}
 
 	buffer = fgets(buffer, buffsize, grpfile); // read header
-	fprintf(output, "Gene\tMutPrevalence\tlog2FC\tPvalue\tBonferroni\n");
+	fprintf(output, "Gene\tlog2FC\tPvalue\tBonferroni\tMutPrevalence\n");
 	for(i = 0; i < linenum; i++){
 		buffer = fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
@@ -470,10 +519,17 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		pvalue = mannwhitney(cpyset, groups, count, &log2fc);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
-		fprintf(output, "%s\t%d%%\t%.10e\t%.10e\t%.10e\n", actrowid, mutprev, log2fc, pvalue, bonferroni);
+		//fprintf(output, "%s\t%.10e\t%.10e\t%.10e\t%d%%\n", actrowid, log2fc, pvalue, bonferroni, mutprev);
+		storeres(&res[resnum], actrowid, log2fc, pvalue, bonferroni, mutprev);
+		resnum++;
 		progress(i, linenum);
 	}
 
+	sortresult(res, 0, resnum-1);
+	for(i = 0; i < resnum; i++){
+		fprintf(output, "%s\t%.10e\t%.10e\t%.10e\t%d%%\n", res[i].genename, res[i].log2FC, res[i].p, res[i].FWER, res[i].mutprev);
+	}
+end:
 	free(buffer);
 	free(set);
 	free(cpyset);
