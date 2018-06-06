@@ -269,7 +269,7 @@ void progress(int i, int max){
 
 	perc = i * 100 / max;
 	if( perc % 10 == 0 && perc != prevperc){
-		printf("MESSAGE:%d%%\n", perc);
+		printf("MESSAGE:%d\n", perc);
 		prevperc = perc;
 	}
 }
@@ -442,7 +442,6 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		pvalue = mannwhitney(set, cpygroups, width, &log2fc);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
-		//fprintf(output, "%s\t%.10e\t%.10e\t%.10e\n", actrowid, log2fc, pvalue, bonferroni);
 		storeres(&res[resnum], actrowid, log2fc, pvalue, bonferroni, 0);
 		resnum++;
 		progress(i, linenum);
@@ -450,7 +449,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 
 	sortresult(res, 0, resnum-1);
 	for(i = 0; i < resnum; i++){
-		fprintf(output, "%s\t%.10e\t%.10e\t%.10e\n", res[i].genename, res[i].log2FC, res[i].p, res[i].FWER);
+		fprintf(output, "%s\t%.2e\t%.2e\t%.2e\n", res[i].genename, res[i].log2FC, res[i].p, res[i].FWER);
 	}
 end:
 	free(res);
@@ -519,7 +518,6 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		pvalue = mannwhitney(cpyset, groups, count, &log2fc);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
-		//fprintf(output, "%s\t%.10e\t%.10e\t%.10e\t%d%%\n", actrowid, log2fc, pvalue, bonferroni, mutprev);
 		storeres(&res[resnum], actrowid, log2fc, pvalue, bonferroni, mutprev);
 		resnum++;
 		progress(i, linenum);
@@ -527,7 +525,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 
 	sortresult(res, 0, resnum-1);
 	for(i = 0; i < resnum; i++){
-		fprintf(output, "%s\t%.10e\t%.10e\t%.10e\t%d%%\n", res[i].genename, res[i].log2FC, res[i].p, res[i].FWER, res[i].mutprev);
+		fprintf(output, "%s\t%.2e\t%.2e\t%.2e\t%d%%\n", res[i].genename, res[i].log2FC, res[i].p, res[i].FWER, res[i].mutprev);
 	}
 end:
 	free(buffer);
