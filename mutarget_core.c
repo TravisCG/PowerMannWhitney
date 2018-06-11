@@ -449,7 +449,12 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 
 	sortresult(res, 0, resnum-1);
 	for(i = 0; i < resnum; i++){
-		fprintf(output, "%s\t%.2e\t%.2e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER);
+		if(res[i].p == table[0]){
+			fprintf(output, "%s\t%.2e\t<%.2e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER);
+		}
+		else{
+			fprintf(output, "%s\t%.2e\t%.2e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER);
+		}
 	}
 end:
 	free(res);
@@ -525,7 +530,12 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 
 	sortresult(res, 0, resnum-1);
 	for(i = 0; i < resnum; i++){
-		fprintf(output, "%s\t%.2e\t%.2e\t%.2e\t%d%%\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER, res[i].mutprev);
+		if(res[i].p == table[0]){
+			fprintf(output, "%s\t%.2e\t<%.2e\t%.2e\t%d%%\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER, res[i].mutprev);
+		}
+		else{
+			fprintf(output, "%s\t%.2e\t%.2e\t%.2e\t%d%%\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER, res[i].mutprev);
+		}
 	}
 end:
 	free(buffer);
