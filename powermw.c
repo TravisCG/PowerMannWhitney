@@ -151,7 +151,7 @@ double mannwhitney(double *set, int *groups, int num, double *log2foldch) {
 	s1 = s1 / numa;
 	s2 = s2 / numb;
 
-	*log2foldch = log2(s1 / s2);
+	*log2foldch = log2(s2 / s1);
 
 	z = (U - (numa * numb / 2)) / sqrt(numa*numb*(numa+numb+1)/12.0);
 	if(z < -6.0){

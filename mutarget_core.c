@@ -11,7 +11,7 @@ enum filtertype {none, include, exclude};
 
 typedef struct Result {
 	char genename[30];
-	double log2FC;
+	double FC;
 	double p;
 	double FWER;
 	int mutprev;
@@ -151,7 +151,7 @@ void fillZtable(){
 }
 
 /* Mann-Whitney test */
-double mannwhitney(double *set, int *groups, int num, double *log2foldch) {
+double mannwhitney(double *set, int *groups, int num, double *foldch) {
 	double *r, sa = 0.0, sb = 0.0, numa = 0.0, numb = 0.0;
 	double s1 = 0.0, s2 = 0.0;
 	double Ua, Ub, U, z, p;
@@ -182,7 +182,7 @@ double mannwhitney(double *set, int *groups, int num, double *log2foldch) {
 
 	if(numa == 0.0 || numb == 0.0){
 		// Avoiding division by zero, return value is non-significant
-		*log2foldch = 0.0;
+		*foldch = 0.0;
 		return(1.0);
 	}
 
@@ -194,7 +194,7 @@ double mannwhitney(double *set, int *groups, int num, double *log2foldch) {
 	s1 = s1 / numa;
 	s2 = s2 / numb;
 
-	*log2foldch = log2(s1 / s2);
+	*foldch = s2 / s1;
 
 	z = (U - (numa * numb / 2)) / sqrt(numa*numb*(numa+numb+1)/12.0);
 	if(z < -6.0){
@@ -363,9 +363,9 @@ int calcmutprev(int *groups, int count){
 	return(mut * 100 / count);
 }
 
-void storeres(Result *r, char *rowid, double log2fc, double p, double adjp, int m){
+void storeres(Result *r, char *rowid, double fc, double p, double adjp, int m){
 	strcpy(r->genename, rowid);
-	r->log2FC  = log2fc;
+	r->FC      = fc;
 	r->p       = p;
 	r->FWER    = adjp;
 	r->mutprev = m;
@@ -379,7 +379,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	int *cpygroups;
 	int width = 0;
 	double *set;
-	double pvalue, log2fc = 100.0, bonferroni = 1.0;
+	double pvalue, fc = 100.0, bonferroni = 1.0;
 	int i;
 	int linenum, impcolcount = 0;
 	char foundr1 = 0, foundr2 = 1;
@@ -439,17 +439,17 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		if(f != none){
 			width = reorder(set, cpygroups, importantcols, width);
 		}
-		pvalue = mannwhitney(set, cpygroups, width, &log2fc);
+		pvalue = mannwhitney(set, cpygroups, width, &fc);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
-		storeres(&res[resnum], actrowid, log2fc, pvalue, bonferroni, 0);
+		storeres(&res[resnum], actrowid, fc, pvalue, bonferroni, 0);
 		resnum++;
 		progress(i, linenum);
 	}
 
 	sortresult(res, 0, resnum-1);
 	for(i = 0; i < resnum; i++){
-		fprintf(output, "%s\t%.2e\t%.2e\t%.2e\n", res[i].genename, res[i].log2FC, res[i].p, res[i].FWER);
+		fprintf(output, "%s\t%.2e\t%.2e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER);
 	}
 end:
 	free(res);
@@ -467,7 +467,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	int count = 0;
 	double *set;
 	double *cpyset;
-	double pvalue, log2fc = 100.0, bonferroni = 1.0;
+	double pvalue, fc = 0.0, bonferroni = 1.0;
 	int *groups;
 	int i, mutprev;
 	int linenum = -1;
@@ -515,17 +515,17 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		}
 
 		mutprev = calcmutprev(groups, count);
-		pvalue = mannwhitney(cpyset, groups, count, &log2fc);
+		pvalue = mannwhitney(cpyset, groups, count, &fc);
 		bonferroni = pvalue * linenum;
 		if(bonferroni > 1.0) bonferroni = 1.0;
-		storeres(&res[resnum], actrowid, log2fc, pvalue, bonferroni, mutprev);
+		storeres(&res[resnum], actrowid, fc, pvalue, bonferroni, mutprev);
 		resnum++;
 		progress(i, linenum);
 	}
 
 	sortresult(res, 0, resnum-1);
 	for(i = 0; i < resnum; i++){
-		fprintf(output, "%s\t%.2e\t%.2e\t%.2e\t%d%%\n", res[i].genename, res[i].log2FC, res[i].p, res[i].FWER, res[i].mutprev);
+		fprintf(output, "%s\t%.2e\t%.2e\t%.2e\t%d%%\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER, res[i].mutprev);
 	}
 end:
 	free(buffer);

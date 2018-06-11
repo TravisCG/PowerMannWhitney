@@ -36,7 +36,7 @@ for the Mann-Whitney test.
 
 There is an alternative version (mutarget_core.c), which is used in www.mutarget.com. It has some additional
 filtering options. I do not recommend the usage of this version in a standalone environment, because it is
-optimized for the website.
+optimized for the website (My boss said they are clinicians and cannot understand log2FC and other things).
 
 ## Compiling
 
