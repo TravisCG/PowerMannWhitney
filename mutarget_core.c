@@ -429,7 +429,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	}
 
 	buffer = fgets(buffer, buffsize, valuefile); // read header
-	fprintf(output, "Gene\tfoldchange\tPvalue\tBonferroni\n");
+	fprintf(output, "Gene\tFoldchange\tPvalue\tBonferroni\n");
 	for(i = 0; i < linenum; i++){
 		buffer = fgets(buffer, buffsize, valuefile);
 		// Do MannWhitney
@@ -504,7 +504,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	}
 
 	buffer = fgets(buffer, buffsize, grpfile); // read header
-	fprintf(output, "Gene\tfoldchange\tPvalue\tBonferroni\tMutPrevalence\n");
+	fprintf(output, "Gene\tFoldchange\tPvalue\tBonferroni\tMutPrevalence\n");
 	for(i = 0; i < linenum; i++){
 		buffer = fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
