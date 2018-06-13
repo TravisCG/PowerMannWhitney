@@ -13,7 +13,6 @@ typedef struct Result {
 	char genename[30];
 	double FC;
 	double p;
-	double FWER;
 	double mutprev;
 } Result;
 
@@ -68,10 +67,10 @@ int partres(Result *r, int lo, int hi){
 	double pivot;
 	int i, j;
 
-	pivot = r[hi].FWER;
+	pivot = r[hi].p;
 	i = lo - 1;
 	for(j = lo; j < hi; j++){
-		if(r[j].FWER < pivot){
+		if(r[j].p > pivot){
 			i++;
 			swapres(r, i, j);
 		}
@@ -363,11 +362,10 @@ double calcmutprev(int *groups, int count){
 	return((double)mut / (double)count);
 }
 
-void storeres(Result *r, char *rowid, double fc, double p, double adjp, double m){
+void storeres(Result *r, char *rowid, double fc, double p, double m){
 	strcpy(r->genename, rowid);
 	r->FC      = fc;
 	r->p       = p;
-	r->FWER    = adjp;
 	r->mutprev = m;
 }
 
@@ -379,7 +377,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	int *cpygroups;
 	int width = 0;
 	double *set;
-	double pvalue, fc = 100.0, bonferroni = 1.0;
+	double pvalue, fc = 100.0, alpha, minalpha;
 	int i;
 	int linenum, impcolcount = 0;
 	char foundr1 = 0, foundr2 = 1;
@@ -429,7 +427,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	}
 
 	buffer = fgets(buffer, buffsize, valuefile); // read header
-	fprintf(output, "Gene\tFoldchange\tPvalue\tBonferroni\n");
+	fprintf(output, "Gene\tFoldchange\tPvalue\tFDR\n");
 	for(i = 0; i < linenum; i++){
 		buffer = fgets(buffer, buffsize, valuefile);
 		// Do MannWhitney
@@ -440,20 +438,24 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 			width = reorder(set, cpygroups, importantcols, width);
 		}
 		pvalue = mannwhitney(set, cpygroups, width, &fc);
-		bonferroni = pvalue * linenum;
-		if(bonferroni > 1.0) bonferroni = 1.0;
-		storeres(&res[resnum], actrowid, fc, pvalue, bonferroni, 0);
+		storeres(&res[resnum], actrowid, fc, pvalue, 0);
 		resnum++;
 		progress(i, linenum);
 	}
 
 	sortresult(res, 0, resnum-1);
+	minalpha = 1.0;
 	for(i = 0; i < resnum; i++){
+		// Benjamini-Hochberg procedure
+		alpha = (double)resnum / (double)(resnum - i) * res[i].p;
+		if(alpha < minalpha){
+			minalpha = alpha;
+		}
 		if(res[i].p == table[0]){
-			fprintf(output, "%s\t%.2f\t<%.1e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER);
+			fprintf(output, "%s\t%.2f\t<%.1e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, minalpha);
 		}
 		else{
-			fprintf(output, "%s\t%.2f\t%.1e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER);
+			fprintf(output, "%s\t%.2f\t%.1e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, minalpha);
 		}
 	}
 end:
@@ -472,7 +474,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	int count = 0;
 	double *set;
 	double *cpyset;
-	double pvalue, fc = 0.0, bonferroni = 1.0, mutprev;
+	double pvalue, fc = 0.0, mutprev, alpha, minalpha;
 	int *groups;
 	int i;
 	int linenum = -1;
@@ -509,7 +511,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	}
 
 	buffer = fgets(buffer, buffsize, grpfile); // read header
-	fprintf(output, "Gene\tFoldchange\tPvalue\tBonferroni\tMutPrevalence\n");
+	fprintf(output, "Gene\tFoldchange\tPvalue\tFDR\tMutPrevalence\n");
 	for(i = 0; i < linenum; i++){
 		buffer = fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
@@ -521,20 +523,25 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 
 		mutprev = calcmutprev(groups, count);
 		pvalue = mannwhitney(cpyset, groups, count, &fc);
-		bonferroni = pvalue * linenum;
-		if(bonferroni > 1.0) bonferroni = 1.0;
-		storeres(&res[resnum], actrowid, fc, pvalue, bonferroni, mutprev);
+		storeres(&res[resnum], actrowid, fc, pvalue, mutprev);
 		resnum++;
 		progress(i, linenum);
 	}
 
 	sortresult(res, 0, resnum-1);
+	minalpha = 1.0;
 	for(i = 0; i < resnum; i++){
+		// Benjamini-Hochberg procedure
+		alpha = (double)resnum / (double)(resnum - i) * res[i].p;
+		if(alpha < minalpha){
+			minalpha = alpha;
+		}
+
 		if(res[i].p == table[0]){
-			fprintf(output, "%s\t%.2f\t<%.1e\t%.2e\t%.1f%%\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER, res[i].mutprev);
+			fprintf(output, "%s\t%.2f\t<%.1e\t%.2e\t%.1f%%\n", res[i].genename, res[i].FC, res[i].p, minalpha, res[i].mutprev);
 		}
 		else{
-			fprintf(output, "%s\t%.2f\t%.1e\t%.2e\t%.1f%%\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER, res[i].mutprev);
+			fprintf(output, "%s\t%.2f\t%.1e\t%.2e\t%.1f%%\n", res[i].genename, res[i].FC, res[i].p, minalpha, res[i].mutprev);
 		}
 	}
 end:
