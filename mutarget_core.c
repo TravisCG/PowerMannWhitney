@@ -14,7 +14,7 @@ typedef struct Result {
 	double FC;
 	double p;
 	double FWER;
-	int mutprev;
+	double mutprev;
 } Result;
 
 int partition(double *set, int *groups, int lo, int hi){
@@ -351,7 +351,7 @@ int reorder(double *set, int *groups, char *impcols, int width){
 }
 
 // Calculate the ratio of mutant samples
-int calcmutprev(int *groups, int count){
+double calcmutprev(int *groups, int count){
 	int i, mut = 0;
 
 	for(i = 0; i < count; i++){
@@ -360,10 +360,10 @@ int calcmutprev(int *groups, int count){
 		}
 	}
 
-	return(mut * 100 / count);
+	return((double)mut / (double)count);
 }
 
-void storeres(Result *r, char *rowid, double fc, double p, double adjp, int m){
+void storeres(Result *r, char *rowid, double fc, double p, double adjp, double m){
 	strcpy(r->genename, rowid);
 	r->FC      = fc;
 	r->p       = p;
@@ -450,10 +450,10 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	sortresult(res, 0, resnum-1);
 	for(i = 0; i < resnum; i++){
 		if(res[i].p == table[0]){
-			fprintf(output, "%s\t%.2e\t<%.2e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER);
+			fprintf(output, "%s\t%.2f\t<%.1e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER);
 		}
 		else{
-			fprintf(output, "%s\t%.2e\t%.2e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER);
+			fprintf(output, "%s\t%.2f\t%.1e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER);
 		}
 	}
 end:
@@ -472,9 +472,9 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	int count = 0;
 	double *set;
 	double *cpyset;
-	double pvalue, fc = 0.0, bonferroni = 1.0;
+	double pvalue, fc = 0.0, bonferroni = 1.0, mutprev;
 	int *groups;
-	int i, mutprev;
+	int i;
 	int linenum = -1;
 	char found = 0;
 	Result *res;
@@ -531,10 +531,10 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	sortresult(res, 0, resnum-1);
 	for(i = 0; i < resnum; i++){
 		if(res[i].p == table[0]){
-			fprintf(output, "%s\t%.2e\t<%.2e\t%.2e\t%d%%\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER, res[i].mutprev);
+			fprintf(output, "%s\t%.2f\t<%.1e\t%.2e\t%.1f%%\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER, res[i].mutprev);
 		}
 		else{
-			fprintf(output, "%s\t%.2e\t%.2e\t%.2e\t%d%%\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER, res[i].mutprev);
+			fprintf(output, "%s\t%.2f\t%.1e\t%.2e\t%.1f%%\n", res[i].genename, res[i].FC, res[i].p, res[i].FWER, res[i].mutprev);
 		}
 	}
 end:
