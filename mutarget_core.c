@@ -5,6 +5,8 @@
 
 #define MAXWIDTH 10000
 #define BUFFSIZE 50000
+#define SHOW_NO_MUTPREV 0
+#define SHOW_MUTPREV 1
 
 double *table; // Z-table to speed up lookup
 enum filtertype {none, include, exclude};
@@ -146,6 +148,31 @@ void fillZtable(){
 		s += 0.0001 * ( (prev + actual) / 2.0); // Numerical integral calculation
 		table[i] = s * 2.0; // Two-tail p value
 		prev = actual;
+	}
+}
+
+void prettyprint(FILE *output, Result res, double padjust, int show){
+	fprintf(output, "%s\t%.2f\t", res.genename, res.FC);
+	if(res.p == table[0]){
+		fprintf(output, "<");
+	}
+	if(res.p < 0.001){
+		fprintf(output, "%.1e\t", res.p);
+	}
+	else{
+		fprintf(output, "%.3g\t", res.p);
+	}
+	if(padjust < 0.001){
+		fprintf(output, "%.2e", padjust);
+	}
+	else{
+		fprintf(output, "%.3g", padjust);
+	}
+	if(show == SHOW_NO_MUTPREV){
+		fprintf(output, "\n");
+	}
+	else{
+		fprintf(output, "%.1f%%\n", res.mutprev);
 	}
 }
 
@@ -451,12 +478,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		if(alpha < minalpha){
 			minalpha = alpha;
 		}
-		if(res[i].p == table[0]){
-			fprintf(output, "%s\t%.2f\t<%.1e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, minalpha);
-		}
-		else{
-			fprintf(output, "%s\t%.2f\t%.1e\t%.2e\n", res[i].genename, res[i].FC, res[i].p, minalpha);
-		}
+		prettyprint(output, res[i], minalpha, SHOW_NO_MUTPREV);
 	}
 end:
 	free(res);
@@ -536,13 +558,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		if(alpha < minalpha){
 			minalpha = alpha;
 		}
-
-		if(res[i].p == table[0]){
-			fprintf(output, "%s\t%.2f\t<%.1e\t%.2e\t%.1f%%\n", res[i].genename, res[i].FC, res[i].p, minalpha, res[i].mutprev);
-		}
-		else{
-			fprintf(output, "%s\t%.2f\t%.1e\t%.2e\t%.1f%%\n", res[i].genename, res[i].FC, res[i].p, minalpha, res[i].mutprev);
-		}
+		prettyprint(output, res[i], minalpha, SHOW_MUTPREV);
 	}
 end:
 	free(buffer);
