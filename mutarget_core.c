@@ -172,7 +172,7 @@ void prettyprint(FILE *output, Result res, double padjust, int show){
 		fprintf(output, "\n");
 	}
 	else{
-		fprintf(output, "\t%.1f%%\n", res.mutprev);
+		fprintf(output, "\t%.1f%%\n", res.mutprev * 100.0);
 	}
 }
 
