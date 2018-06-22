@@ -157,10 +157,10 @@ void prettyprint(FILE *output, Result res, int show){
 		fprintf(output, "<");
 	}
 	if(res.p < 0.001){
-		fprintf(output, "%.1e\t", res.p);
+		fprintf(output, "%.1e", res.p);
 	}
 	else{
-		fprintf(output, "%.3g\t", res.p);
+		fprintf(output, "%.3g", res.p);
 	}
 	if(show == SHOW_NO_MUTPREV){
 		fprintf(output, "\n");
