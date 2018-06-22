@@ -72,7 +72,7 @@ int partres(Result *r, int lo, int hi){
 	pivot = r[hi].p;
 	i = lo - 1;
 	for(j = lo; j < hi; j++){
-		if(r[j].p > pivot){
+		if(r[j].p < pivot){
 			i++;
 			swapres(r, i, j);
 		}
@@ -151,7 +151,7 @@ void fillZtable(){
 	}
 }
 
-void prettyprint(FILE *output, Result res, double padjust, int show){
+void prettyprint(FILE *output, Result res, int show){
 	fprintf(output, "%s\t%.2f\t", res.genename, res.FC);
 	if(res.p == table[0]){
 		fprintf(output, "<");
@@ -161,12 +161,6 @@ void prettyprint(FILE *output, Result res, double padjust, int show){
 	}
 	else{
 		fprintf(output, "%.3g\t", res.p);
-	}
-	if(padjust < 0.001){
-		fprintf(output, "%.2e", padjust);
-	}
-	else{
-		fprintf(output, "%.3g", padjust);
 	}
 	if(show == SHOW_NO_MUTPREV){
 		fprintf(output, "\n");
@@ -404,18 +398,18 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	int *cpygroups;
 	int width = 0;
 	double *set;
-	double pvalue, fc = 100.0, alpha, minalpha;
+	double pvalue, fc = 100.0;
 	int i;
 	int linenum, impcolcount = 0;
 	char foundr1 = 0, foundr2 = 1;
 	Result *res;
 	int resnum = 0;
 
-	buffer        = malloc(sizeof(char) * buffsize);
-	groups        = malloc(sizeof(int) * MAXWIDTH);
+	buffer        = malloc(sizeof(char)   * buffsize);
+	groups        = malloc(sizeof(int)    * MAXWIDTH);
 	set           = malloc(sizeof(double) * MAXWIDTH);
-	cpygroups     = malloc(sizeof(int) * MAXWIDTH);
-	importantcols = malloc(sizeof(char) * MAXWIDTH);
+	cpygroups     = malloc(sizeof(int)    * MAXWIDTH);
+	importantcols = malloc(sizeof(char)   * MAXWIDTH);
 
 	printf("MESSAGE:Measure input size\n");
 	linenum = countlines(valuefile, buffer, buffsize);
@@ -454,7 +448,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	}
 
 	buffer = fgets(buffer, buffsize, valuefile); // read header
-	fprintf(output, "Gene\tFoldchange\tPvalue\tFDR\n");
+	fprintf(output, "Gene\tFoldchange\tPvalue\n");
 	for(i = 0; i < linenum; i++){
 		buffer = fgets(buffer, buffsize, valuefile);
 		// Do MannWhitney
@@ -471,14 +465,8 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	}
 
 	sortresult(res, 0, resnum-1);
-	minalpha = 1.0;
 	for(i = 0; i < resnum; i++){
-		// Benjamini-Hochberg procedure
-		alpha = (double)resnum / (double)(resnum - i) * res[i].p;
-		if(alpha < minalpha){
-			minalpha = alpha;
-		}
-		prettyprint(output, res[i], minalpha, SHOW_NO_MUTPREV);
+		prettyprint(output, res[i], SHOW_NO_MUTPREV);
 	}
 end:
 	free(res);
@@ -496,7 +484,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	int count = 0;
 	double *set;
 	double *cpyset;
-	double pvalue, fc = 0.0, mutprev, alpha, minalpha;
+	double pvalue, fc = 0.0, mutprev;
 	int *groups;
 	int i;
 	int linenum = -1;
@@ -533,7 +521,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	}
 
 	buffer = fgets(buffer, buffsize, grpfile); // read header
-	fprintf(output, "Gene\tFoldchange\tPvalue\tFDR\tMutPrevalence\n");
+	fprintf(output, "Gene\tFoldchange\tPvalue\tMutPrevalence\n");
 	for(i = 0; i < linenum; i++){
 		buffer = fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
@@ -551,14 +539,8 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	}
 
 	sortresult(res, 0, resnum-1);
-	minalpha = 1.0;
 	for(i = 0; i < resnum; i++){
-		// Benjamini-Hochberg procedure
-		alpha = (double)resnum / (double)(resnum - i) * res[i].p;
-		if(alpha < minalpha){
-			minalpha = alpha;
-		}
-		prettyprint(output, res[i], minalpha, SHOW_MUTPREV);
+		prettyprint(output, res[i], SHOW_MUTPREV);
 	}
 end:
 	free(buffer);
