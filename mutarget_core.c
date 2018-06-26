@@ -151,7 +151,7 @@ void fillZtable(){
 	}
 }
 
-void prettyprint(FILE *output, Result res, double padjust, int show){
+void prettyprint(FILE *output, Result res, double padjust, int show, double avgmut, double avgwt){
 	fprintf(output, "%s\t%.2f\t", res.genename, res.FC);
 	if(res.p == table[0]){
 		fprintf(output, "<");
@@ -172,7 +172,7 @@ void prettyprint(FILE *output, Result res, double padjust, int show){
 		fprintf(output, "\n");
 	}
 	else{
-		fprintf(output, "\t%.1f%%\n", res.mutprev * 100.0);
+		fprintf(output, "\t%.1f%%\t%.2f\t%.2f\n", res.mutprev * 100.0, avgmut, avgwt);
 	}
 }
 
@@ -377,16 +377,17 @@ int reorder(double *set, int *groups, char *impcols, int width){
 }
 
 // Calculate the ratio of mutant samples
-double calcmutprev(int *groups, int count){
-	int i, mut = 0;
+double calcmutprev(int *groups, int count, int *mut){
+	int i, m = 0;
 
 	for(i = 0; i < count; i++){
 		if(groups[i] == 1){
-			mut++;
+			m++;
 		}
 	}
 
-	return((double)mut / (double)count);
+	*mut = m;
+	return((double)m / (double)count);
 }
 
 void storeres(Result *r, char *rowid, double fc, double p, double m){
@@ -478,7 +479,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		if(alpha < minalpha){
 			minalpha = alpha;
 		}
-		prettyprint(output, res[i], minalpha, SHOW_NO_MUTPREV);
+		prettyprint(output, res[i], minalpha, SHOW_NO_MUTPREV, 0.0, 0.0);
 	}
 end:
 	free(res);
@@ -496,9 +497,9 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	int count = 0;
 	double *set;
 	double *cpyset;
-	double pvalue, fc = 0.0, mutprev, alpha, minalpha;
+	double pvalue, fc = 0.0, mutprev, alpha, minalpha, avgmut = 0.0, avgwt = 0.0;
 	int *groups;
-	int i;
+	int i, mutnum;
 	int linenum = -1;
 	char found = 0;
 	Result *res;
@@ -533,7 +534,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	}
 
 	buffer = fgets(buffer, buffsize, grpfile); // read header
-	fprintf(output, "Gene\tFoldchange\tPvalue\tFDR\tMutPrevalence\n");
+	fprintf(output, "Gene\tFoldchange\tPvalue\tFDR\tMutPrevalence\tAverageMutant\tAverageWildType\n");
 	for(i = 0; i < linenum; i++){
 		buffer = fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
@@ -543,7 +544,9 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 			count = reorder(cpyset, groups, importantcols, count);
 		}
 
-		mutprev = calcmutprev(groups, count);
+		mutprev = calcmutprev(groups, count, &mutnum);
+		avgmut += mutnum;
+		avgwt  += (count - mutnum);
 		pvalue = mannwhitney(cpyset, groups, count, &fc);
 		storeres(&res[resnum], actrowid, fc, pvalue, mutprev);
 		resnum++;
@@ -552,13 +555,16 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 
 	sortresult(res, 0, resnum-1);
 	minalpha = 1.0;
+	avgmut   = avgmut / (double)linenum;
+	avgwt    = avgwt / (double)linenum;
+
 	for(i = 0; i < resnum; i++){
 		// Benjamini-Hochberg procedure
 		alpha = (double)resnum / (double)(resnum - i) * res[i].p;
 		if(alpha < minalpha){
 			minalpha = alpha;
 		}
-		prettyprint(output, res[i], minalpha, SHOW_MUTPREV);
+		prettyprint(output, res[i], minalpha, SHOW_MUTPREV, avgmut, avgwt);
 	}
 end:
 	free(buffer);
