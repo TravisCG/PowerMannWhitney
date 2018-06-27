@@ -16,6 +16,8 @@ typedef struct Result {
 	double FC;
 	double p;
 	double mutprev;
+	double mutexp;
+	double wtexp;
 } Result;
 
 int partition(double *set, int *groups, int lo, int hi){
@@ -151,7 +153,7 @@ void fillZtable(){
 	}
 }
 
-void prettyprint(FILE *output, Result res, double padjust, int show, double avgmut, double avgwt){
+void prettyprint(FILE *output, Result res, double padjust, int show){
 	fprintf(output, "%s\t%.2f\t", res.genename, res.FC);
 	if(res.p == table[0]){
 		fprintf(output, "<");
@@ -172,12 +174,12 @@ void prettyprint(FILE *output, Result res, double padjust, int show, double avgm
 		fprintf(output, "\n");
 	}
 	else{
-		fprintf(output, "\t%.1f%%\t%.2f\t%.2f\n", res.mutprev * 100.0, avgmut, avgwt);
+		fprintf(output, "\t%.1f%%\t%.2f\t%.2f\n", res.mutprev * 100.0, res.mutexp, res.wtexp);
 	}
 }
 
 /* Mann-Whitney test */
-double mannwhitney(double *set, int *groups, int num, double *foldch) {
+double mannwhitney(double *set, int *groups, int num, double *foldch, double *mutexp, double *wtexp) {
 	double *r, sa = 0.0, sb = 0.0, numa = 0.0, numb = 0.0;
 	double s1 = 0.0, s2 = 0.0;
 	double Ua, Ub, U, z, p;
@@ -221,6 +223,8 @@ double mannwhitney(double *set, int *groups, int num, double *foldch) {
 	s2 = s2 / numb;
 
 	*foldch = s2 / s1;
+	*mutexp = s2;
+	*wtexp  = s1;
 
 	z = (U - (numa * numb / 2)) / sqrt(numa*numb*(numa+numb+1)/12.0);
 	if(z < -6.0){
@@ -390,11 +394,13 @@ double calcmutprev(int *groups, int count, int *mut){
 	return((double)m / (double)count);
 }
 
-void storeres(Result *r, char *rowid, double fc, double p, double m){
+void storeres(Result *r, char *rowid, double fc, double p, double m, double me, double we){
 	strcpy(r->genename, rowid);
 	r->FC      = fc;
 	r->p       = p;
 	r->mutprev = m;
+	r->mutexp  = me;
+	r->wtexp   = we;
 }
 
 void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum filtertype f, char *rowid2){
@@ -404,7 +410,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	int *groups;
 	int *cpygroups;
 	int width = 0;
-	double *set;
+	double *set, mutexp = 0.0, wtexp = 0.0;
 	double pvalue, fc = 100.0, alpha, minalpha;
 	int i;
 	int linenum, impcolcount = 0;
@@ -465,8 +471,8 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		if(f != none){
 			width = reorder(set, cpygroups, importantcols, width);
 		}
-		pvalue = mannwhitney(set, cpygroups, width, &fc);
-		storeres(&res[resnum], actrowid, fc, pvalue, 0);
+		pvalue = mannwhitney(set, cpygroups, width, &fc, &mutexp, &wtexp);
+		storeres(&res[resnum], actrowid, fc, pvalue, 0, mutexp, wtexp);
 		resnum++;
 		progress(i, linenum);
 	}
@@ -479,7 +485,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		if(alpha < minalpha){
 			minalpha = alpha;
 		}
-		prettyprint(output, res[i], minalpha, SHOW_NO_MUTPREV, 0.0, 0.0);
+		prettyprint(output, res[i], minalpha, SHOW_NO_MUTPREV);
 	}
 end:
 	free(res);
@@ -495,9 +501,9 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	int buffsize = BUFFSIZE;
 	char *actrowid;
 	int count = 0;
-	double *set;
+	double *set, mutexp = 0.0, wtexp = 0.0;
 	double *cpyset;
-	double pvalue, fc = 0.0, mutprev, alpha, minalpha, avgmut = 0.0, avgwt = 0.0;
+	double pvalue, fc = 0.0, mutprev, alpha, minalpha;
 	int *groups;
 	int i, mutnum;
 	int linenum = -1;
@@ -534,7 +540,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	}
 
 	buffer = fgets(buffer, buffsize, grpfile); // read header
-	fprintf(output, "Gene\tFoldchange\tPvalue\tFDR\tMutPrevalence\tAverageMutant\tAverageWildType\n");
+	fprintf(output, "Gene\tFoldchange\tPvalue\tFDR\tMutPrevalence\tAverageMutantExpression\tAverageWildTypeExpression\n");
 	for(i = 0; i < linenum; i++){
 		buffer = fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
@@ -545,18 +551,15 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		}
 
 		mutprev = calcmutprev(groups, count, &mutnum);
-		avgmut += mutnum;
-		avgwt  += (count - mutnum);
-		pvalue = mannwhitney(cpyset, groups, count, &fc);
-		storeres(&res[resnum], actrowid, fc, pvalue, mutprev);
+
+		pvalue = mannwhitney(cpyset, groups, count, &fc, &mutexp, &wtexp);
+		storeres(&res[resnum], actrowid, fc, pvalue, mutprev, mutexp, wtexp);
 		resnum++;
 		progress(i, linenum);
 	}
 
 	sortresult(res, 0, resnum-1);
 	minalpha = 1.0;
-	avgmut   = avgmut / (double)linenum;
-	avgwt    = avgwt / (double)linenum;
 
 	for(i = 0; i < resnum; i++){
 		// Benjamini-Hochberg procedure
@@ -564,7 +567,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		if(alpha < minalpha){
 			minalpha = alpha;
 		}
-		prettyprint(output, res[i], minalpha, SHOW_MUTPREV, avgmut, avgwt);
+		prettyprint(output, res[i], minalpha, SHOW_MUTPREV);
 	}
 end:
 	free(buffer);
