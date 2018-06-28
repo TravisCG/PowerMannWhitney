@@ -403,7 +403,7 @@ void storeres(Result *r, char *rowid, double fc, double p, double m, double me, 
 	r->wtexp   = we;
 }
 
-void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum filtertype f, char *rowid2){
+void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum filtertype f, char *rowid2, double foldlimit){
 	char *buffer, *importantcols;
 	int buffsize = BUFFSIZE;
 	char *actrowid;
@@ -411,7 +411,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	int *cpygroups;
 	int width = 0;
 	double *set, mutexp = 0.0, wtexp = 0.0;
-	double pvalue, fc = 100.0, alpha, minalpha;
+	double pvalue, fc = 100.0, alpha, minalpha, perc;
 	int i;
 	int linenum, impcolcount = 0;
 	char foundr1 = 0, foundr2 = 1;
@@ -472,8 +472,16 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 			width = reorder(set, cpygroups, importantcols, width);
 		}
 		pvalue = mannwhitney(set, cpygroups, width, &fc, &mutexp, &wtexp);
-		storeres(&res[resnum], actrowid, fc, pvalue, 0, mutexp, wtexp);
-		resnum++;
+		if(fc < 1.0){
+			perc = 1.0 - fc;
+		}
+		else{
+			perc = fc - 1.0;
+		}
+		if(perc > foldlimit){
+			storeres(&res[resnum], actrowid, fc, pvalue, 0, mutexp, wtexp);
+			resnum++;
+		}
 		progress(i, linenum);
 	}
 
@@ -496,14 +504,14 @@ end:
 	free(importantcols);
 }
 
-void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum filtertype f, char *rowid2){
+void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum filtertype f, char *rowid2, double foldlimit, double mutplimit){
 	char *buffer, *importantcols;
 	int buffsize = BUFFSIZE;
 	char *actrowid;
 	int count = 0;
 	double *set, mutexp = 0.0, wtexp = 0.0;
 	double *cpyset;
-	double pvalue, fc = 0.0, mutprev, alpha, minalpha;
+	double pvalue, fc = 0.0, mutprev, alpha, minalpha, perc;
 	int *groups;
 	int i, mutnum;
 	int linenum = -1;
@@ -551,10 +559,21 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		}
 
 		mutprev = calcmutprev(groups, count, &mutnum);
+		if(mutprev < mutplimit){
+			continue;
+		}
 
 		pvalue = mannwhitney(cpyset, groups, count, &fc, &mutexp, &wtexp);
-		storeres(&res[resnum], actrowid, fc, pvalue, mutprev, mutexp, wtexp);
-		resnum++;
+		if(fc > 1.0){
+			perc = fc - 1.0;
+		}
+		else{
+			perc = 1.0 - fc;
+		}
+		if(perc > foldlimit){
+			storeres(&res[resnum], actrowid, fc, pvalue, mutprev, mutexp, wtexp);
+			resnum++;
+		}
 		progress(i, linenum);
 	}
 
@@ -584,38 +603,65 @@ int main(int argc, char **argv){
 	FILE *grpfile;
 	FILE *valuefile;
 	FILE *output;
-	char *rowid2;
-	enum filtertype filter;
+	char *rowid1 = NULL, *rowid2 = NULL;
+	enum filtertype filter = none;
+	int i;
 
-	if(argc < 6){
-		printf("Usage: powermw onegroup|onevalue rowid groupfile valuefile resultfile include|exclude|none rowid2\n");
-		return(0);
+	char *type = NULL;
+	char *grpfilename = NULL;
+	char *valuefilename = NULL, *outname = NULL;
+	double mutplim = 0.01, foldlimit = 0.5;
+
+	for(i = 1; i < argc; i++){
+		if(!strcmp(argv[i], "-t")){
+			type = argv[i+1];
+		}
+		if(!strcmp(argv[i], "-r")){
+			rowid1 = argv[i+1];
+		}
+		if(!strcmp(argv[i], "-g")){
+			grpfilename = argv[i+1];
+		}
+		if(!strcmp(argv[i], "-v")){
+			valuefilename = argv[i+1];
+		}
+		if(!strcmp(argv[i], "-o")){
+			outname = argv[i+1];
+		}
+		if(!strcmp(argv[i], "-f")){
+			if(!strcmp(argv[i+1], "include")){
+				filter = include;
+			}
+			else if(!strcmp(argv[i+1], "exclude")){
+				filter = exclude;
+			}
+		}
+		if(!strcmp(argv[i], "-b")){
+			rowid2 = argv[i+1];
+		}
+		if(!strcmp(argv[i], "-h")){
+			printf("Usage: powermw -t onegroup|onevalue -r rowid -g groupfile -v valuefile -o resultfile -f include|exclude|none -b rowid2 -m 0.1 -l 0.5\n");
+			return(0);
+		}
+		if(!strcmp(argv[i], "-m")){
+			mutplim = atof(argv[i+1]);
+		}
+		if(!strcmp(argv[i], "-l")){
+			foldlimit = atof(argv[i+1]);
+		}
 	}
 
-	grpfile   = fopen(argv[3], "r");
-	valuefile = fopen(argv[4], "r");
-	output    = fopen(argv[5], "w");
-	if(argc >= 8 && !strcmp(argv[6], "exclude")){
-		filter = exclude;
-		rowid2 = argv[7];
-	} 
-	else if(argc >= 8 && !strcmp(argv[6], "include")){
-		filter = include;
-		rowid2 = argv[7];
-	}
-	else{
-		filter = none;
-		rowid2 = NULL;
-	}
-
+	grpfile   = fopen(grpfilename, "r");
+	valuefile = fopen(valuefilename, "r");
+	output    = fopen(outname, "w");
 
 	fillZtable();
 
-	if(!strcmp(argv[1], "onegroup")){
-		onegroup(grpfile, argv[2], valuefile, output, filter, rowid2);
+	if(!strcmp(type, "onegroup")){
+		onegroup(grpfile, rowid1, valuefile, output, filter, rowid2, foldlimit);
 	}
 	else{
-		onevalue(valuefile, argv[2], grpfile, output, filter, rowid2);
+		onevalue(valuefile, rowid1, grpfile, output, filter, rowid2, foldlimit, mutplim);
 	}
 
 	fclose(grpfile);
