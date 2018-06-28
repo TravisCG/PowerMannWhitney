@@ -153,7 +153,10 @@ void fillZtable(){
 	}
 }
 
-void prettyprint(FILE *output, Result res, double padjust, int show){
+void prettyprint(FILE *output, Result res, double padjust, int show, double plimit){
+	if(res.p >= plimit){
+		return;
+	}
 	fprintf(output, "%s\t%.2f\t", res.genename, res.FC);
 	if(res.p == table[0]){
 		fprintf(output, "<");
@@ -403,7 +406,7 @@ void storeres(Result *r, char *rowid, double fc, double p, double m, double me, 
 	r->wtexp   = we;
 }
 
-void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum filtertype f, char *rowid2, double foldlimit){
+void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum filtertype f, char *rowid2, double foldlimit, double plimit){
 	char *buffer, *importantcols;
 	int buffsize = BUFFSIZE;
 	char *actrowid;
@@ -493,7 +496,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		if(alpha < minalpha){
 			minalpha = alpha;
 		}
-		prettyprint(output, res[i], minalpha, SHOW_NO_MUTPREV);
+		prettyprint(output, res[i], minalpha, SHOW_NO_MUTPREV, plimit);
 	}
 end:
 	free(res);
@@ -504,7 +507,7 @@ end:
 	free(importantcols);
 }
 
-void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum filtertype f, char *rowid2, double foldlimit, double mutplimit){
+void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum filtertype f, char *rowid2, double foldlimit, double plimit, double mutplimit){
 	char *buffer, *importantcols;
 	int buffsize = BUFFSIZE;
 	char *actrowid;
@@ -586,7 +589,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		if(alpha < minalpha){
 			minalpha = alpha;
 		}
-		prettyprint(output, res[i], minalpha, SHOW_MUTPREV);
+		prettyprint(output, res[i], minalpha, SHOW_MUTPREV, plimit);
 	}
 end:
 	free(buffer);
@@ -610,7 +613,7 @@ int main(int argc, char **argv){
 	char *type = NULL;
 	char *grpfilename = NULL;
 	char *valuefilename = NULL, *outname = NULL;
-	double mutplim = 0.01, foldlimit = 0.5;
+	double mutplim = 0.01, foldlimit = 0.5, plimit = 0.05;
 
 	for(i = 1; i < argc; i++){
 		if(!strcmp(argv[i], "-t")){
@@ -640,7 +643,7 @@ int main(int argc, char **argv){
 			rowid2 = argv[i+1];
 		}
 		if(!strcmp(argv[i], "-h")){
-			printf("Usage: powermw -t onegroup|onevalue -r rowid -g groupfile -v valuefile -o resultfile -f include|exclude|none -b rowid2 -m 0.1 -l 0.5\n");
+			printf("Usage: powermw -t onegroup|onevalue -r rowid -g groupfile -v valuefile -o resultfile -f include|exclude|none -b rowid2 -m 0.1 -l 0.5 -p 0.05\n");
 			return(0);
 		}
 		if(!strcmp(argv[i], "-m")){
@@ -648,6 +651,9 @@ int main(int argc, char **argv){
 		}
 		if(!strcmp(argv[i], "-l")){
 			foldlimit = atof(argv[i+1]);
+		}
+		if(!strcmp(argv[i], "-p")){
+			plimit = atof(argv[i+1]);
 		}
 	}
 
@@ -658,10 +664,10 @@ int main(int argc, char **argv){
 	fillZtable();
 
 	if(!strcmp(type, "onegroup")){
-		onegroup(grpfile, rowid1, valuefile, output, filter, rowid2, foldlimit);
+		onegroup(grpfile, rowid1, valuefile, output, filter, rowid2, foldlimit, plimit);
 	}
 	else{
-		onevalue(valuefile, rowid1, grpfile, output, filter, rowid2, foldlimit, mutplim);
+		onevalue(valuefile, rowid1, grpfile, output, filter, rowid2, foldlimit, plimit, mutplim);
 	}
 
 	fclose(grpfile);
