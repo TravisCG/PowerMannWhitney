@@ -97,6 +97,13 @@ float mid(int lo, int hi){
 	return( (hi - lo) / 2.0 + lo + 1.0);
 }
 
+double min(double a, double b){
+	return( a < b ? a : b);
+}
+
+double max(double a, double b){
+	return( a < b ? b : a);
+}
 /* Convert an ordered list into ranks */
 int rank(double *set, int num, double *rank){
 	int i, loindex, j, ranki;
@@ -414,7 +421,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	int *cpygroups;
 	int width = 0;
 	double *set, mutexp = 0.0, wtexp = 0.0;
-	double pvalue, fc = 100.0, alpha, minalpha, perc;
+	double pvalue, fc = 100.0, alpha, minalpha;
 	int i;
 	int linenum, impcolcount = 0;
 	char foundr1 = 0, foundr2 = 1;
@@ -475,13 +482,11 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 			width = reorder(set, cpygroups, importantcols, width);
 		}
 		pvalue = mannwhitney(set, cpygroups, width, &fc, &mutexp, &wtexp);
-		if(fc < 1.0){
-			perc = 1.0 - fc;
+		// Don't ask what the hell it is. 
+		if(foldlimit < 1.0){
+			foldlimit = foldlimit + 1.0;
 		}
-		else{
-			perc = fc - 1.0;
-		}
-		if(perc > foldlimit){
+		if(fc > max(foldlimit, 1.0 / foldlimit) || fc < min(foldlimit, 1.0 / foldlimit)){
 			storeres(&res[resnum], actrowid, fc, pvalue, 0, mutexp, wtexp);
 			resnum++;
 		}
@@ -514,7 +519,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	int count = 0;
 	double *set, mutexp = 0.0, wtexp = 0.0;
 	double *cpyset;
-	double pvalue, fc = 0.0, mutprev, alpha, minalpha, perc;
+	double pvalue, fc = 0.0, mutprev, alpha, minalpha;
 	int *groups;
 	int i, mutnum;
 	int linenum = -1;
@@ -567,13 +572,10 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		}
 
 		pvalue = mannwhitney(cpyset, groups, count, &fc, &mutexp, &wtexp);
-		if(fc > 1.0){
-			perc = fc - 1.0;
+		if(foldlimit < 1.0){
+			foldlimit = foldlimit + 1.0;
 		}
-		else{
-			perc = 1.0 - fc;
-		}
-		if(perc > foldlimit){
+		if(fc > max(foldlimit, 1.0 / foldlimit) || fc < min(foldlimit, 1.0 / foldlimit)){
 			storeres(&res[resnum], actrowid, fc, pvalue, mutprev, mutexp, wtexp);
 			resnum++;
 		}
