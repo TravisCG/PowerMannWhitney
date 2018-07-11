@@ -18,6 +18,7 @@ typedef struct Result {
 	double mutprev;
 	double mutexp;
 	double wtexp;
+	double FDR;
 } Result;
 
 int partition(double *set, int *groups, int lo, int hi){
@@ -67,7 +68,7 @@ void swapres(Result *r, int i, int j){
 	r[j]  = dummy;
 }
 
-int partres(Result *r, int lo, int hi){
+int partres_desc(Result *r, int lo, int hi){
 	double pivot;
 	int i, j;
 
@@ -83,13 +84,35 @@ int partres(Result *r, int lo, int hi){
 	return(i+1);
 }
 
-void sortresult(Result *r, int lo, int hi){
+int partres_asc(Result *r, int lo, int hi){
+	double pivot;
+	int i, j;
+
+	pivot = r[hi].p;
+	i = lo - 1;
+	for(j = lo; j < hi; j++){
+		if(r[j].p < pivot){
+			i++;
+			swapres(r, i, j);
+		}
+	}
+	swapres(r, i + 1, hi);
+	return(i+1);
+
+}
+
+void sortresult(Result *r, int lo, int hi, int order){
 	int p;
 
 	if(lo < hi){
-		p = partres(r, lo, hi);
-		sortresult(r, lo, p - 1);
-		sortresult(r, p + 1, hi);
+		if(order == 0){
+			p = partres_desc(r, lo, hi);
+		}
+		else{
+			p = partres_asc(r, lo, hi);
+		}
+		sortresult(r, lo, p - 1, order);
+		sortresult(r, p + 1, hi, order);
 	}
 }
 
@@ -160,7 +183,8 @@ void fillZtable(){
 	}
 }
 
-void prettyprint(FILE *output, Result res, double padjust, int show, double plimit){
+/* Print out the results in a pretty way */
+void prettyprint(FILE *output, Result res, int show, double plimit){
 	if(res.p >= plimit){
 		return;
 	}
@@ -174,11 +198,11 @@ void prettyprint(FILE *output, Result res, double padjust, int show, double plim
 	else{
 		fprintf(output, "%.3g\t", res.p);
 	}
-	if(padjust < 0.001){
-		fprintf(output, "%.2e", padjust);
+	if(res.FDR < 0.001){
+		fprintf(output, "%.2e", res.FDR);
 	}
 	else{
-		fprintf(output, "%.3g", padjust);
+		fprintf(output, "%.3g", res.FDR);
 	}
 	if(show == SHOW_NO_MUTPREV){
 		fprintf(output, "\n");
@@ -471,7 +495,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	}
 
 	buffer = fgets(buffer, buffsize, valuefile); // read header
-	fprintf(output, "Gene\tFoldchange\tPvalue\tFDR\n");
+	fprintf(output, "Gene\tFold change\tP value\tFDR\n");
 	for(i = 0; i < linenum; i++){
 		buffer = fgets(buffer, buffsize, valuefile);
 		// Do MannWhitney
@@ -493,7 +517,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		progress(i, linenum);
 	}
 
-	sortresult(res, 0, resnum-1);
+	sortresult(res, 0, resnum-1, 0);
 	minalpha = 1.0;
 	for(i = 0; i < resnum; i++){
 		// Benjamini-Hochberg procedure
@@ -501,7 +525,12 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		if(alpha < minalpha){
 			minalpha = alpha;
 		}
-		prettyprint(output, res[i], minalpha, SHOW_NO_MUTPREV, plimit);
+		res[i].FDR = minalpha;
+	}
+
+	sortresult(res, 0, resnum - 1, 1);
+	for(i = 0; i < resnum; i++){
+		prettyprint(output, res[i], SHOW_NO_MUTPREV, plimit);
 	}
 end:
 	free(res);
@@ -556,7 +585,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	}
 
 	buffer = fgets(buffer, buffsize, grpfile); // read header
-	fprintf(output, "Gene\tFoldchange\tPvalue\tFDR\tMutPrevalence\tAverageMutantExpression\tAverageWildTypeExpression\n");
+	fprintf(output, "Gene\tFold change\tP value\tFDR\tMutation Prevalence\tAverage mutant expression\tAverage wild type expression\n");
 	for(i = 0; i < linenum; i++){
 		buffer = fgets(buffer, buffsize, grpfile);
 		actrowid = strtok(buffer, "\t");
@@ -582,7 +611,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		progress(i, linenum);
 	}
 
-	sortresult(res, 0, resnum-1);
+	sortresult(res, 0, resnum-1, 0);
 	minalpha = 1.0;
 
 	for(i = 0; i < resnum; i++){
@@ -591,7 +620,12 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		if(alpha < minalpha){
 			minalpha = alpha;
 		}
-		prettyprint(output, res[i], minalpha, SHOW_MUTPREV, plimit);
+		res[i].FDR = minalpha;
+	}
+
+	sortresult(res, 0, resnum - 1, 1);
+	for(i = 0; i < resnum; i++){
+		prettyprint(output, res[i], SHOW_MUTPREV, plimit);
 	}
 end:
 	free(buffer);
