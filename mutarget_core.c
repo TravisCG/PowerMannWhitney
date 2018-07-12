@@ -120,13 +120,6 @@ float mid(int lo, int hi){
 	return( (hi - lo) / 2.0 + lo + 1.0);
 }
 
-double min(double a, double b){
-	return( a < b ? a : b);
-}
-
-double max(double a, double b){
-	return( a < b ? b : a);
-}
 /* Convert an ordered list into ranks */
 int rank(double *set, int num, double *rank){
 	int i, loindex, j, ranki;
@@ -506,11 +499,8 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 			width = reorder(set, cpygroups, importantcols, width);
 		}
 		pvalue = mannwhitney(set, cpygroups, width, &fc, &mutexp, &wtexp);
-		// Don't ask what the hell it is. 
-		if(foldlimit < 1.0){
-			foldlimit = foldlimit + 1.0;
-		}
-		if(fc > max(foldlimit, 1.0 / foldlimit) || fc < min(foldlimit, 1.0 / foldlimit)){
+		// Don't ask what the hell it is. I need to filter fold change such a way
+		if(fc > foldlimit && fc < (1.0/foldlimit)){
 			storeres(&res[resnum], actrowid, fc, pvalue, 0, mutexp, wtexp);
 			resnum++;
 		}
@@ -601,10 +591,8 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 		}
 
 		pvalue = mannwhitney(cpyset, groups, count, &fc, &mutexp, &wtexp);
-		if(foldlimit < 1.0){
-			foldlimit = foldlimit + 1.0;
-		}
-		if(fc > max(foldlimit, 1.0 / foldlimit) || fc < min(foldlimit, 1.0 / foldlimit)){
+
+		if(fc > foldlimit && fc < (1.0/foldlimit)){
 			storeres(&res[resnum], actrowid, fc, pvalue, mutprev, mutexp, wtexp);
 			resnum++;
 		}
