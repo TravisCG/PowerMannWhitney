@@ -11,6 +11,14 @@
 double *table; // Z-table to speed up lookup
 enum filtertype {none, include, exclude};
 
+typedef struct Quartile {
+	double min;
+	double Q1;
+	double Q2;
+	double Q3;
+	double max;
+} Quartile;
+
 typedef struct Result {
 	char genename[30];
 	double FC;
@@ -19,6 +27,8 @@ typedef struct Result {
 	double mutexp;
 	double wtexp;
 	double FDR;
+	Quartile wtq;
+	Quartile mtq;
 } Result;
 
 int partition(double *set, int *groups, int lo, int hi){
@@ -198,6 +208,7 @@ void prettyprint(FILE *output, Result res, int show, double plimit){
 		fprintf(output, "%.3g", res.FDR);
 	}
 	if(show == SHOW_NO_MUTPREV){
+		fprintf(output, "\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f", res.wtq.min, res.wtq.Q1, res.wtq.Q2, res.wtq.Q3, res.wtq.max, res.mtq.min, res.mtq.Q1, res.mtq.Q2, res.mtq.Q3, res.mtq.max);
 		fprintf(output, "\n");
 	}
 	else{
@@ -205,14 +216,46 @@ void prettyprint(FILE *output, Result res, int show, double plimit){
 	}
 }
 
+/* Calculate quartile percentages from an ordered array */
+void calcQuartile(double *array, int count, Quartile *q){
+	double ratio;
+
+	q->min = array[0];
+	q->max = array[count-1];
+	ratio  = ((double)count + 1.0) / 4.0;
+	if(ratio == floor(ratio)){
+		q->Q1 = array[(count + 1) / 4];
+	}
+	else {
+		q->Q1  = (array[(count + 1) / 4] + array[(count + 1) / 4 - 1]) / 2.0;
+	}
+	ratio = (double)count / 2.0;
+	if(ratio == floor(ratio)){
+		q->Q2 = (array[count / 2] + array[count / 2 - 1]) / 2.0;
+	}
+	else {
+		q->Q2 = array[count / 2];
+	}
+	ratio = ((double)count + 1.0) * 3.0 / 4.0;
+	if(ratio == floor(ratio)){
+		q->Q3 = array[(count + 1) * 3 / 4];
+	}
+	else{
+		q->Q3 = (array[(count + 1) * 3 / 4] + array[(count + 1) * 3 / 4 - 1]) / 2.0;
+	}
+}
+
 /* Mann-Whitney test */
-double mannwhitney(double *set, int *groups, int num, double *foldch, double *mutexp, double *wtexp) {
+double mannwhitney(double *set, int *groups, int num, double *foldch, double *mutexp, double *wtexp, Quartile *wtq, Quartile *mutq) {
 	double *r, sa = 0.0, sb = 0.0, numa = 0.0, numb = 0.0;
+	double *mut, *wt; /* For quantile calculation */
 	double s1 = 0.0, s2 = 0.0;
 	double Ua, Ub, U, z, p;
-	int i;
+	int i, muti = 0, wti = 0;
 
-	r = malloc(sizeof(double) * num);
+	r   = malloc(sizeof(double) * num);
+	mut = malloc(sizeof(double) * num);
+	wt  = malloc(sizeof(double) * num);
 	quicksort(set, groups, 0, num-1);
 
         rank(set, num, r);
@@ -222,15 +265,24 @@ double mannwhitney(double *set, int *groups, int num, double *foldch, double *mu
 			sa += r[i];
 			s1 += set[i];
 			numa += 1.0;
+			mut[muti] = set[i];
+			muti++;
 		}
 		else{
 			sb += r[i];
 			s2 += set[i];
 			numb += 1.0;
+			wt[wti] = set[i];
+			wti++;
 		}
 	}
 
+	calcQuartile(mut, muti, mutq);
+	calcQuartile(wt, wti, wtq);
+
 	free(r);
+	free(mut);
+	free(wt);
 
 	Ua = sa - (numa * (numa + 1.0) / 2.0);
 	Ub = sb - (numb * (numb + 1.0) / 2.0);
@@ -421,13 +473,15 @@ double calcmutprev(int *groups, int count, int *mut){
 	return((double)m / (double)count);
 }
 
-void storeres(Result *r, char *rowid, double fc, double p, double m, double me, double we){
+void storeres(Result *r, char *rowid, double fc, double p, double m, double me, double we, Quartile wq, Quartile mq){
 	strcpy(r->genename, rowid);
 	r->FC      = fc;
 	r->p       = p;
 	r->mutprev = m;
 	r->mutexp  = me;
 	r->wtexp   = we;
+	r->wtq     = wq;
+	r->mtq     = mq;
 }
 
 void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum filtertype f, char *rowid2, double foldlimit, double plimit){
@@ -444,6 +498,8 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	char foundr1 = 0, foundr2 = 1;
 	Result *res;
 	int resnum = 0;
+	Quartile mq;
+	Quartile wq;
 
 	buffer        = malloc(sizeof(char) * buffsize);
 	groups        = malloc(sizeof(int) * MAXWIDTH);
@@ -488,7 +544,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 	}
 
 	buffer = fgets(buffer, buffsize, valuefile); // read header
-	fprintf(output, "Gene\tFold change\tP value\tFDR\n");
+	fprintf(output, "Gene\tFold change\tP value\tFDR\tWT Min\tWT Q1\tWT Q2\tWT Q3\tWT Max\tMut Min\tMut Q1\tMut Q2\tMut Q3\tMut Max\n");
 	for(i = 0; i < linenum; i++){
 		buffer = fgets(buffer, buffsize, valuefile);
 		// Do MannWhitney
@@ -498,10 +554,10 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		if(f != none){
 			width = reorder(set, cpygroups, importantcols, width);
 		}
-		pvalue = mannwhitney(set, cpygroups, width, &fc, &mutexp, &wtexp);
+		pvalue = mannwhitney(set, cpygroups, width, &fc, &mutexp, &wtexp, &wq, &mq);
 		// Don't ask what the hell it is. I need to filter fold change such a way
 		if(fc > foldlimit && fc < (1.0/foldlimit)){
-			storeres(&res[resnum], actrowid, fc, pvalue, 0, mutexp, wtexp);
+			storeres(&res[resnum], actrowid, fc, pvalue, 0, mutexp, wtexp, wq, mq);
 			resnum++;
 		}
 		progress(i, linenum);
@@ -545,6 +601,8 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 	char found = 0;
 	Result *res;
 	int resnum = 0;
+	Quartile wq;
+	Quartile mq;
 
 	buffer = malloc(sizeof(char) * buffsize);
 	set    = malloc(sizeof(double) * MAXWIDTH);
@@ -590,10 +648,10 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 			continue;
 		}
 
-		pvalue = mannwhitney(cpyset, groups, count, &fc, &mutexp, &wtexp);
+		pvalue = mannwhitney(cpyset, groups, count, &fc, &mutexp, &wtexp, &wq, &mq);
 
 		if(fc > foldlimit && fc < (1.0/foldlimit)){
-			storeres(&res[resnum], actrowid, fc, pvalue, mutprev, mutexp, wtexp);
+			storeres(&res[resnum], actrowid, fc, pvalue, mutprev, mutexp, wtexp, wq, mq);
 			resnum++;
 		}
 		progress(i, linenum);
