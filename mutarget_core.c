@@ -419,6 +419,18 @@ int parsevalue(double *set){
 	return(count);
 }
 
+/* Calculate average expression */
+double getavgexp(double *set, int count){
+	int i;
+	double avg = 0.0;
+
+	for(i = 0; i < count; i++){
+		avg += set[i];
+	}
+	avg = avg / (double)count;
+	return(avg);
+}
+
 int parseimpcol(char *cols, enum filtertype f){
 	int count = 0;
 	char *value;
@@ -484,7 +496,7 @@ void storeres(Result *r, char *rowid, double fc, double p, double m, double me, 
 	r->mtq     = mq;
 }
 
-void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum filtertype f, char *rowid2, double foldlimit, double plimit){
+void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum filtertype f, char *rowid2, double foldlimit, double plimit, double avgexpfilt){
 	char *buffer, *importantcols;
 	int buffsize = BUFFSIZE;
 	char *actrowid;
@@ -553,6 +565,10 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		memcpy(cpygroups, groups, sizeof(int) * width);
 		if(f != none){
 			width = reorder(set, cpygroups, importantcols, width);
+		}
+
+		if(getavgexp(set, width) < avgexpfilt){
+			continue;
 		}
 		pvalue = mannwhitney(set, cpygroups, width, &fc, &mutexp, &wtexp, &wq, &mq);
 		// Don't ask what the hell it is. I need to filter fold change such a way
@@ -695,7 +711,7 @@ int main(int argc, char **argv){
 	char *type = NULL;
 	char *grpfilename = NULL;
 	char *valuefilename = NULL, *outname = NULL;
-	double mutplim = 0.01, foldlimit = 0.5, plimit = 0.05;
+	double mutplim = 0.01, foldlimit = 0.5, plimit = 0.05, avgexpfilt = 0.0;
 
 	for(i = 1; i < argc; i++){
 		if(!strcmp(argv[i], "-t")){
@@ -725,7 +741,7 @@ int main(int argc, char **argv){
 			rowid2 = argv[i+1];
 		}
 		if(!strcmp(argv[i], "-h")){
-			printf("Usage: powermw -t onegroup|onevalue -r rowid -g groupfile -v valuefile -o resultfile -f include|exclude|none -b rowid2 -m 0.1 -l 0.5 -p 0.05\n");
+			printf("Usage: powermw -t onegroup|onevalue -r rowid -g groupfile -v valuefile -o resultfile -f include|exclude|none -b rowid2 -m 0.1 -l 0.5 -p 0.05 -a 0.0\n");
 			return(0);
 		}
 		if(!strcmp(argv[i], "-m")){
@@ -737,6 +753,9 @@ int main(int argc, char **argv){
 		if(!strcmp(argv[i], "-p")){
 			plimit = atof(argv[i+1]);
 		}
+		if(!strcmp(argv[i], "-a")){
+			avgexpfilt = atof(argv[i+1]);
+		}
 	}
 
 	grpfile   = fopen(grpfilename, "r");
@@ -746,7 +765,7 @@ int main(int argc, char **argv){
 	fillZtable();
 
 	if(!strcmp(type, "onegroup")){
-		onegroup(grpfile, rowid1, valuefile, output, filter, rowid2, foldlimit, plimit);
+		onegroup(grpfile, rowid1, valuefile, output, filter, rowid2, foldlimit, plimit, avgexpfilt);
 	}
 	else{
 		onevalue(valuefile, rowid1, grpfile, output, filter, rowid2, foldlimit, plimit, mutplim);
