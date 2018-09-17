@@ -208,7 +208,7 @@ void prettyprint(FILE *output, Result res, int show, double plimit){
 		fprintf(output, "%.3g", res.FDR);
 	}
 	if(show == SHOW_NO_MUTPREV){
-		fprintf(output, "\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f", res.wtq.min, res.wtq.Q1, res.wtq.Q2, res.wtq.Q3, res.wtq.max, res.mtq.min, res.mtq.Q1, res.mtq.Q2, res.mtq.Q3, res.mtq.max);
+		fprintf(output, "\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f", res.wtq.min, res.wtq.Q1, res.wtq.Q2, res.wtq.Q3, res.wtq.max, res.mtq.min, res.mtq.Q1, res.mtq.Q2, res.mtq.Q3, res.mtq.max);
 		fprintf(output, "\n");
 	}
 	else{
