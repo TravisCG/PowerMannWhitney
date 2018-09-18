@@ -265,15 +265,15 @@ double mannwhitney(double *set, int *groups, int num, double *foldch, double *mu
 			sa += r[i];
 			s1 += set[i];
 			numa += 1.0;
-			mut[muti] = set[i];
-			muti++;
+			wt[wti] = set[i];
+			wti++;
 		}
 		else{
 			sb += r[i];
 			s2 += set[i];
 			numb += 1.0;
-			wt[wti] = set[i];
-			wti++;
+			mut[muti] = set[i];
+			muti++;
 		}
 	}
 
