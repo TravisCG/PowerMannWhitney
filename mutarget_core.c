@@ -572,7 +572,7 @@ void onegroup(FILE *grpfile, char *rowid, FILE *valuefile, FILE *output, enum fi
 		}
 		pvalue = mannwhitney(set, cpygroups, width, &fc, &mutexp, &wtexp, &wq, &mq);
 		// Don't ask what the hell it is. I need to filter fold change such a way
-		if(fc > foldlimit && fc < (1.0/foldlimit)){
+		if(fc > foldlimit || fc < (1.0/foldlimit)){
 			storeres(&res[resnum], actrowid, fc, pvalue, 0, mutexp, wtexp, wq, mq);
 			resnum++;
 		}
@@ -666,7 +666,7 @@ void onevalue(FILE *valuefile, char *rowid, FILE *grpfile, FILE *output, enum fi
 
 		pvalue = mannwhitney(cpyset, groups, count, &fc, &mutexp, &wtexp, &wq, &mq);
 
-		if(fc > foldlimit && fc < (1.0/foldlimit)){
+		if(fc > foldlimit || fc < (1.0/foldlimit)){
 			storeres(&res[resnum], actrowid, fc, pvalue, mutprev, mutexp, wtexp, wq, mq);
 			resnum++;
 		}
@@ -749,6 +749,10 @@ int main(int argc, char **argv){
 		}
 		if(!strcmp(argv[i], "-l")){
 			foldlimit = atof(argv[i+1]);
+			if(foldlimit < 1.0){
+				printf("WARNING: Fold limit should be bigger than 1.0\n");
+				return(0);
+			}
 		}
 		if(!strcmp(argv[i], "-p")){
 			plimit = atof(argv[i+1]);
