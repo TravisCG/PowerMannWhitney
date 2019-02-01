@@ -301,7 +301,8 @@ double mannwhitney(double *set, int *groups, int num, double *foldch, double *mu
 	s1 = s1 / numa;
 	s2 = s2 / numb;
 
-	*foldch = s2 / s1;
+	//*foldch = s2 / s1;
+	*foldch = mutq->Q2 / wtq->Q2;
 	*mutexp = s2;
 	*wtexp  = s1;
 
